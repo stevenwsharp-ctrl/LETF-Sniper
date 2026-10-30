@@ -429,7 +429,7 @@ footer{margin-top:24px;font-size:12px;color:var(--mute);line-height:1.7}
       <div class="label">Contact</div>
       <h2>Questions, feedback or paid access?</h2>
       <p class="sub" style="font-size:13px">Write directly. Every message is read.</p>
-      <div class="ctmail"><a href="mailto:sniperdesk@proton.me?subject=LETF%20Sniper">sniperdesk@proton.me</a><button id="ctCopy">Copy email</button></div>
+      <div class="ctmail"><a href="mailto:sniperdesk.tribunal635@passmail.net?subject=LETF%20Sniper">sniperdesk.tribunal635@passmail.net</a><button id="ctCopy">Copy email</button></div>
       <form id="ctForm" class="ctform">
         <label>Topic<select id="ctTopic"><option>Feedback</option><option>Subscription / paid access</option><option>Bug report</option><option>Feature request</option><option>Partnership or press</option><option>Other</option></select></label>
         <label>Your name<input id="ctName" maxlength="80" autocomplete="name"></label>
@@ -440,7 +440,7 @@ footer{margin-top:24px;font-size:12px;color:var(--mute);line-height:1.7}
   </div>
 
   <footer>
-    <div class="ftc">Contact: <a href="#/contact">sniperdesk@proton.me</a> · <a href="#/contact">Contact page</a> · Sister site: <a href="../SOXX-Sniper/">SOXX Sniper</a></div>
+    <div class="ftc">Contact: <a href="#/contact">sniperdesk.tribunal635@passmail.net</a> · <a href="#/contact">Contact page</a> · Sister site: <a href="../SOXX-Sniper/">SOXX Sniper</a></div>
     Fund list: Nasdaq ETF screener (refreshed twice a day). Quotes: StockTwits batch quotes (most active funds real-time; thinly traded funds show their last trade) and Yahoo Finance for charts. Leveraged ETFs reset daily and lose value in choppy markets; they are made for short holding periods. Nothing here is investment advice.
   </footer>
 </div>
@@ -710,8 +710,8 @@ $("wkSave").onclick=async()=>{const v=$("wkIn").value.trim().replace(/\/+$/,"");
 $("demoBtn").onclick=async()=>{demo=true;$("modal").classList.remove("show");await loadUniverse();await tick()};
 $("themeBtn").onclick=()=>setTheme(document.documentElement.dataset.theme==="light"?"dark":"light");
 /* ---------- contact ---------- */
-$("ctCopy").onclick=e=>copyText("sniperdesk@proton.me",e.target);
-$("ctForm").onsubmit=e=>{e.preventDefault();const t=$("ctTopic").value,n=$("ctName").value.trim(),m=$("ctMsg").value.trim();if(!m)return;location.href="mailto:sniperdesk@proton.me?subject="+encodeURIComponent("LETF Sniper · "+t)+"&body="+encodeURIComponent(m+(n?"\n\n— "+n:""))};
+$("ctCopy").onclick=e=>copyText("sniperdesk.tribunal635@passmail.net",e.target);
+$("ctForm").onsubmit=e=>{e.preventDefault();const t=$("ctTopic").value,n=$("ctName").value.trim(),m=$("ctMsg").value.trim();if(!m)return;location.href="mailto:sniperdesk.tribunal635@passmail.net?subject="+encodeURIComponent("LETF Sniper · "+t)+"&body="+encodeURIComponent(m+(n?"\n\n— "+n:""))};
 /* ---------- demo data ---------- */
 function demoUniverse(){
   const S=[["AXTX",2,"AXTI","stock"],["AXTU",2,"AXTI","stock"],["SPCH",2,"SPCX","stock"],["NVDL",2,"NVDA","stock"],["NVDD",-1,"NVDA","stock"],["TSLL",2,"TSLA","stock"],["TSLQ",-2,"TSLA","stock"],["MSTU",2,"MSTR","stock"],["MSTZ",-2,"MSTR","stock"],["CONL",2,"COIN","stock"],["AMDL",2,"AMD","stock"],["PLTU",2,"PLTR","stock"],["SMCX",2,"SMCI","stock"],["IONX",2,"IONQ","stock"],["RGTX",2,"RGTI","stock"],["OKLL",2,"OKLO","stock"],["HOOX",2,"HOOD","stock"],["AAPU",2,"AAPL","stock"],["METU",2,"META","stock"],["CRWG",2,"CRWV","stock"],
@@ -992,6 +992,6 @@ start().then(()=>{if(curF)fvLoad(curF,true)});
 <script>(function(){const el=document.getElementById("widthSel");if(!el)return;let v="fit";try{v=localStorage.getItem("site_width")||"fit"}catch(e){}el.value=v;
 el.onchange=()=>{const x=el.value;try{localStorage.setItem("site_width",x)}catch(e){}document.documentElement.style.setProperty("--pagew",x==="fit"?"100%":x+"px");window.dispatchEvent(new Event("resize"))}})();</script>
 <script src="sell.js?v=2"></script>
-<script src="terms.js?v=1"></script>
+<script src="terms.js?v=2"></script>
 </body>
 </html>
