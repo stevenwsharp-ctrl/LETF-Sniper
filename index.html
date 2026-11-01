@@ -219,6 +219,7 @@ canvas{width:100%;height:100%;display:block}
 .tw{overflow-x:auto}
 table.tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
 .tbl th{font-weight:400;color:var(--dim);text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl th.srt{cursor:pointer;user-select:none}.tbl th.srt:hover{color:var(--ink)}.tbl th.srt.on{color:var(--accent)}.tbl th .sarr{font-size:10px}
 .tbl td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--rowline);white-space:nowrap}
 .tbl th:first-child,.tbl td:first-child,.tbl td.l,.tbl th.l{text-align:left}
 .tbl tr.cur td{background:rgba(77,163,255,.08);color:var(--accent)}
@@ -551,8 +552,15 @@ function sorted(L){
   const by={gain:(a,b)=>b.pct-a.pct,lose:(a,b)=>a.pct-b.pct,active:(a,b)=>b.dv-a.dv,mom:(a,b)=>Math.abs(b.m15||0)-Math.abs(a.m15||0),surge:(a,b)=>(b.pace||0)-(a.pace||0),
     ext:(a,b)=>Math.abs(b.ext?b.ext.pct:0)-Math.abs(a.ext?a.ext.pct:0),high:(a,b)=>(b.pos||0)*b.pct-(a.pos||0)*a.pct,all:(a,b)=>a.s<b.s?-1:1}[SC.tab];
   let R=L.filter(r=>isFinite(r.pct));if(SC.tab==="ext")R=R.filter(r=>r.ext);if(SC.tab==="mom")R=R.filter(r=>isFinite(r.m15));if(SC.tab==="surge")R=R.filter(r=>isFinite(r.pace));if(SC.tab==="high")R=R.filter(r=>r.pos>=0.9&&r.pct>0);
-  return R.sort(by);
+  R.sort(by);
+  // column sort (click a heading): applied after the tab's own filter and order; blank values always go last
+  const C=SC.col&&COLS[SC.col];if(C){const d=SC.cdir||1;R.sort((a,b)=>{const x=C.v(a),y=C.v(b),bx=x==null||(typeof x==="number"&&!isFinite(x)),by2=y==null||(typeof y==="number"&&!isFinite(y));
+    if(bx||by2)return bx&&by2?0:bx?1:-1;return(typeof x==="string"?x.localeCompare(y):x-y)*d})}
+  return R;
 }
+// sortable columns: value for each row, and the first direction (1 = low to high / A to Z, -1 = high to low)
+const COLS={fund:{v:r=>r.s,d:1},lev:{v:r=>r.L,d:-1},under:{v:r=>r.upct,d:-1},price:{v:r=>r.last,d:-1},day:{v:r=>r.pct,d:-1},m15:{v:r=>r.m15,d:-1},ext:{v:r=>r.ext?r.ext.pct:NaN,d:-1},
+  vol:{v:r=>r.vol,d:-1},dv:{v:r=>r.dv,d:-1},range:{v:r=>r.pos,d:-1},gap:{v:r=>r.gap,d:-1},sig:{v:r=>r.sig.length?r.sig.length+Math.min(0.99,Math.abs(r.pct)):0,d:-1}};
 function renderScanner(){
   $("scanTabs").innerHTML=TABS.map(([k,l])=>`<button data-tab="${k}" class="${SC.tab===k?"on":""}">${l}</button>`).join("");
   const ch=(attr,val,lab,on)=>`<button data-${attr}="${val}" class="chipb ${on?"on":""}">${lab}</button>`;
@@ -562,7 +570,8 @@ function renderScanner(){
     `<select id="minDv">${[[0,"Any $ volume"],[1e5,"$100k+ traded"],[1e6,"$1M+ traded"],[1e7,"$10M+ traded"],[1e8,"$100M+ traded"]].map(([v,l])=>`<option value="${v}" ${+SC.minDv===v?"selected":""}>${l}</option>`).join("")}</select>`;
   const R=sorted(filtered());$("scanCount").textContent=`${UNI.length||"--"}`;
   const ph=phaseAt(Date.now()),showExt=ph!=="regular"||SC.tab==="ext";
-  const hdr=`<tr><th data-tip="watch"></th><th class="l">Fund</th><th>Lev.</th><th class="l">Underlying</th><th>Price</th><th>Day</th>${showExt?"<th>Ext. hours</th>":"<th>15 min</th>"}<th>Volume</th><th>$ traded</th><th class="l">Day range</th><th>vs implied</th><th class="l">Signals</th></tr>`;
+  const sh=(k,lab,cl)=>`<th class="${cl||""} srt${SC.col===k?" on":""}" data-scol="${k}">${lab}<span class="sarr">${SC.col===k?(SC.cdir>0?" ▲":" ▼"):""}</span></th>`;
+  const hdr=`<tr><th data-tip="watch"></th>${sh("fund","Fund","l")}${sh("lev","Lev.")}${sh("under","Underlying","l")}${sh("price","Price")}${sh("day","Day")}${showExt?sh("ext","Ext. hours"):sh("m15","15 min")}${sh("vol","Volume")}${sh("dv","$ traded")}${sh("range","Day range","l")}${sh("gap","vs implied")}${sh("sig","Signals","l")}</tr>`;
   $("scanTbl").innerHTML=hdr+(R.slice(0,SC.n).map(r=>`<tr data-f="${r.s}">
     <td><span class="star ${WATCH.includes(r.s)?"on":""}" data-star="${r.s}" title="Watchlist">${WATCH.includes(r.s)?"★":"☆"}</span></td>
     <td class="l">${logoHtml(r.kind==="stock"&&r.u?r.u:r.s)}<b>${r.s}</b><div class="sub nm">${esc(r.n.slice(0,44))}</div></td>
@@ -580,7 +589,8 @@ function renderScanner(){
 }
 document.addEventListener("click",e=>{
   const st=e.target.closest("[data-star]");if(st){e.stopPropagation();const s=st.dataset.star;WATCH=WATCH.includes(s)?WATCH.filter(x=>x!==s):[...WATCH,s];saveW();render(true);if(curF)fvHead();return}
-  const b=e.target.closest("[data-tab],[data-kind],[data-dir],[data-lev]");if(b){if(b.dataset.tab)SC.tab=b.dataset.tab;if(b.dataset.kind)SC.kind=b.dataset.kind;if(b.dataset.dir)SC.dir=b.dataset.dir;if(b.dataset.lev)SC.lev=b.dataset.lev;SC.n=50;saveSC();render(true);return}
+  const hs=e.target.closest("th[data-scol]");if(hs){const k=hs.dataset.scol,d0=COLS[k].d;if(SC.col!==k){SC.col=k;SC.cdir=d0}else if(SC.cdir===d0)SC.cdir=-d0;else{SC.col=null;SC.cdir=0}SC.n=50;saveSC();renderScanner();return}
+  const b=e.target.closest("[data-tab],[data-kind],[data-dir],[data-lev]");if(b){if(b.dataset.tab){SC.tab=b.dataset.tab;SC.col=null;SC.cdir=0}if(b.dataset.kind)SC.kind=b.dataset.kind;if(b.dataset.dir)SC.dir=b.dataset.dir;if(b.dataset.lev)SC.lev=b.dataset.lev;SC.n=50;saveSC();render(true);return}
   const f=e.target.closest("[data-f]");if(f&&!e.target.closest("a")){location.hash="#/f/"+f.dataset.f}
 });
 document.addEventListener("change",e=>{if(e.target.id==="minDv"){SC.minDv=+e.target.value;saveSC();render(true)}});
@@ -999,7 +1009,7 @@ el.onchange=()=>{const x=el.value;try{localStorage.setItem("site_width",x)}catch
 (function(){
 const T={
  "watch":"<b>Watchlist</b> — select ☆ to add the fund to your watchlist (alerts and the Watch tab). ★ = on your list.",
- "Fund":"<b>Fund</b> — the leveraged or inverse ETF: ticker and name. Select a row to open the fund view with its chart, decay and sister funds.",
+ "Fund":"<b>Fund</b> — the leveraged or inverse ETF: ticker and name. <i>Click any column heading to sort; click again to reverse; a third click returns to the tab's order.</i> Select a row to open the fund view with its chart, decay and sister funds.",
  "Lev.":"<b>Leverage</b> — how many times the fund moves vs its underlying, <b>each day</b>. 2× = twice the daily move. −1×, −2×, −3× = inverse: the fund goes up when the underlying goes down. The daily reset makes long-term returns differ from 'leverage × the move' (decay).",
  "Underlying":"<b>Underlying</b> — what the fund tracks (a stock, an index, a commodity or a currency) and its move today.",
  "Price":"<b>Price</b> — the fund's last trade. A small dot = no trade in the last 30 minutes (thin trading).",
@@ -1020,7 +1030,7 @@ const T={
 const st=document.createElement("style");st.textContent=`.coltip{position:fixed;z-index:9999;max-width:340px;background:var(--panel2,#131a24);color:var(--ink,#e6edf5);border:1px solid var(--line,#1e2835);border-radius:10px;padding:9px 11px;font:12.5px/1.45 var(--sans,system-ui);box-shadow:0 8px 24px rgba(0,0,0,.35);pointer-events:none;opacity:0;transition:opacity .08s}
 .coltip.on{opacity:1}.coltip b{color:var(--ink,#fff)}th.hastip,[data-tip]{cursor:help}th.hastip{text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,currentColor 45%,transparent);text-underline-offset:3px}[data-tip]{border-bottom:1px dotted color-mix(in srgb,currentColor 45%,transparent)}`;document.head.appendChild(st);
 const tip=document.createElement("div");tip.className="coltip";document.body.appendChild(tip);
-const keyOf=el=>el.dataset.tip!=null?el.dataset.tip:el.textContent.replace(/\s+/g," ").trim();
+const keyOf=el=>el.dataset.tip!=null?el.dataset.tip:el.textContent.replace(/[▲▼]/g,"").replace(/\s+/g," ").trim();
 // mark the headings that have an explanation (tables are rebuilt often, so check after each change)
 const mark=()=>document.querySelectorAll("th").forEach(th=>{if(T[keyOf(th)]!=null&&!th.classList.contains("hastip"))th.classList.add("hastip")});
 new MutationObserver(()=>{clearTimeout(mark.t);mark.t=setTimeout(mark,50)}).observe(document.body,{childList:true,subtree:true});mark();
