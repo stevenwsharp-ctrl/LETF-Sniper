@@ -747,7 +747,7 @@ var DEMO={};function demoTick(){const t=Date.now();UNI.forEach((f,i)=>{const d=D
 /* ================= LETF Sniper · fund page ================= */
 var curF=null,curC=false,FV={};
 const fwSave=()=>lsSet("letf_fw",JSON.stringify(FW));
-var FVOPT={view:"1d",vp:true,vwap:true,ema:true,lv:true};try{Object.assign(FVOPT,JSON.parse(lsGet("letf_fvopt")||"{}"))}catch(e){}
+var FVOPT={view:"1d",vp:true,vwap:true,ema:true,lv:true,ext:true};try{Object.assign(FVOPT,JSON.parse(lsGet("letf_fvopt")||"{}"))}catch(e){}
 const yT=s=>/\.X$/.test(s)?s.replace(".X","-USD"):s;
 async function getChart(s,range,interval){
   if(demo)return demoBars(s,range,interval);
@@ -829,7 +829,17 @@ function radarOf(s){
   return R
 }
 /* ---------- data load ---------- */
-function viewBars(s){const d=FV[s];if(!d)return null;const v=FVOPT.view;if(v==="1y")return d.bd;if(v==="5d")return d.b5;
+/* chart views: [key, label, range, interval]; intraday views include pre-market and after-hours unless "Ext. hours" is off */
+const FVV=[["1d","1D · 1m","1d","1m"],["5d","5D · 5m","5d","5m"],["1mo","1M · 30m","1mo","30m"],["3mo","3M · 1h","3mo","60m"],["6mo","6M · day","6mo","1d"],["ytd","YTD · day","1y","1d"],["1y","1Y · day","1y","1d"],["2y","2Y · day","2y","1d"],["5y","5Y · week","5y","1wk"]];
+const fvDaily=()=>["6mo","ytd","1y","2y","5y"].includes(FVOPT.view);
+function extCut(B){if(FVOPT.ext!==false||fvDaily()||!B)return B;const R=B.filter(b=>{const m=etInfo(b[0]).min;return m>=570&&m<960});return R.length>=10?R:B}
+async function fvView(s){const v=FVOPT.view;if(["1d","5d","1y"].includes(v))return;const d=FV[s];if(!d)return;d.v=d.v||{};const V=FVV.find(x=>x[0]===v);if(!V||(d.v[v]&&Date.now()-d.v[v].at<300000))return;
+  let x=await getChart(s,V[2],V[3]);if(v==="5y"&&(!x.bars||x.bars.length<30))x=await getChart(s,"2y","1wk");   /* older Worker: no 5y range */
+  if(x.bars){d.v[v]={at:Date.now(),bars:x.bars};if(curF===s)fvRender(true)}}
+function viewBars(s){const B=viewBars0(s);return extCut(B)}
+function viewBars0(s){const d=FV[s];if(!d)return null;const v=FVOPT.view;if(v==="1y")return d.bd;if(v==="5d")return d.b5;
+  if(v==="ytd"){if(!d.bd)return null;const y=new Date().getFullYear(),t0=Date.UTC(y,0,1);const B=d.bd.filter(b=>b[0]>=t0);return B.length>=5?B:d.bd.slice(-20)}
+  if(!["1d"].includes(v)){const x=d.v&&d.v[v];if(!x){fvView(s);return null}return x.bars}
   if(!d.b1)return null;const day=etInfo(d.b1[d.b1.length-1][0]).d,B=d.b1.filter(b=>etInfo(b[0]).d===day);return B.length>=15?B:d.b1.slice(-390)}
 function livePx(s){const q=QT[s];if(!q)return NaN;return q[8]>0&&q[10]>q[7]?q[8]:q[0]}
 async function fvLoad(s,force){
@@ -876,7 +886,7 @@ function fvHead(){
 }
 function fvRender(full){
   const s=curF;if(!s)return;if(!full)liveBar(s);fvHead();const d=FV[s]||{};
-  $("fvCtl").innerHTML=[["1d","1 day · 1m"],["5d","5 days · 5m"],["1y","1 year · daily"]].map(([k,l])=>`<button data-fvv="${k}" class="${FVOPT.view===k?"on":""}">${l}</button>`).join("")+'<span class="tasep"></span>'+
+  $("fvCtl").innerHTML=FVV.map(([k,l])=>`<button data-fvv="${k}" class="${FVOPT.view===k?"on":""}">${l}</button>`).join("")+'<span class="tasep"></span>'+(fvDaily()?"":`<button data-fvo="ext" class="chipb ${FVOPT.ext!==false?"on":""}" title="Show pre-market (4:00–9:30 ET) and after-hours (4:00–8:00 pm ET) bars">Ext. hours</button>`)+'<span class="tasep"></span>'+
     [["vp","Volume profile"],["vwap","VWAP ±σ"],["ema","EMA 9/21"],["lv","Plan levels"]].map(([k,l])=>`<button data-fvo="${k}" class="chipb ${FVOPT[k]?"on":""}">${l}</button>`).join("");
   const S=setupOf(s);fvDraw(s,S);fvSetupHtml(s,S);fvRadarHtml(s);fvUnderHtml(s);fvDecayHtml(s);fvAlertsHtml(s);
 }
@@ -939,7 +949,7 @@ function fvDraw(s,S){
   if(!B||B.length<2){g.fillStyle=TH.dim;g.fillText((FV[s]||{}).err||"Loading chart…",14,24);FVH=null;$("fvLeg").innerHTML="";return}
   const axW=W<520?50:62,pl=6,pr=W-axW,volH=Math.round(Hh*0.16),top=10,bot=Hh-20-volH,n=B.length;
   let lo=Infinity,hi=-Infinity;B.forEach(b=>{lo=Math.min(lo,b[3]);hi=Math.max(hi,b[2])});
-  const vw=FVOPT.view!=="1y"?vwapBands(B):null;
+  const vw=!fvDaily()?vwapBands(B):null;
   if(FVOPT.lv&&S&&S.plan){lo=Math.min(lo,S.plan.stop,S.plan.tgt);hi=Math.max(hi,S.plan.stop,S.plan.tgt)}
   const pad=(hi-lo)*0.06||hi*0.01;lo-=pad;hi+=pad;
   const X=i=>pl+(i+0.5)*(pr-pl)/n,Y=p=>top+(hi-p)/(hi-lo)*(bot-top),bw=Math.max(1,(pr-pl)/n*0.7);
@@ -947,7 +957,7 @@ function fvDraw(s,S){
   g.strokeStyle=TH.line;g.lineWidth=1;g.fillStyle=TH.mute;g.textAlign="left";
   for(let k=0;k<=5;k++){const p=lo+(hi-lo)*k/5,y=Y(p);g.globalAlpha=0.5;g.beginPath();g.moveTo(pl,y);g.lineTo(pr,y);g.stroke();g.globalAlpha=1;g.fillText(fmtPx(p),pr+6,y+4)}
   /* session shading for extended hours on intraday views */
-  if(FVOPT.view!=="1y"){g.fillStyle=TH.line;g.globalAlpha=0.25;B.forEach((b,i)=>{const m=etInfo(b[0]).min;if(m<570||m>=960)g.fillRect(X(i)-(pr-pl)/n/2,top,(pr-pl)/n+0.5,bot-top)});g.globalAlpha=1}
+  if(!fvDaily()&&FVOPT.ext!==false){g.fillStyle=TH.line;g.globalAlpha=0.25;B.forEach((b,i)=>{const m=etInfo(b[0]).min;if(m<570||m>=960)g.fillRect(X(i)-(pr-pl)/n/2,top,(pr-pl)/n+0.5,bot-top)});g.globalAlpha=1}
   /* volume profile, drawn from the right edge of the plot */
   const VP=profile(B,200);
   if(FVOPT.vp&&VP){const maxW=(pr-pl)*0.24,rh=Math.max(1,(Y(VP.lo)-Y(VP.lo+VP.step)));
@@ -969,7 +979,7 @@ function fvDraw(s,S){
   /* last price tag */
   const lp=livePx(s)||B[n-1][4];if(lp>=lo&&lp<=hi){const y=Y(lp);g.strokeStyle=TH.ink;g.globalAlpha=0.5;g.setLineDash([2,2]);g.beginPath();g.moveTo(pl,y);g.lineTo(pr,y);g.stroke();g.setLineDash([]);g.globalAlpha=1;g.fillStyle=TH.ink;g.fillRect(pr,y-8,axW,16);g.fillStyle=TH.bg;g.fillText(fmtPx(lp),pr+4,y+4)}
   /* time labels */
-  g.fillStyle=TH.mute;g.textAlign="center";const step=Math.max(1,Math.round(n/(W<520?4:7)));for(let i=0;i<n;i+=step){const e=new Date(B[i][0]);g.fillText(FVOPT.view==="1y"?e.toLocaleDateString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric"}):FVOPT.view==="5d"?e.toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"short"})+" "+e.toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric"}):e.toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}),X(i),Hh-5)}g.textAlign="left";
+  g.fillStyle=TH.mute;g.textAlign="center";const step=Math.max(1,Math.round(n/(W<520?4:7)));for(let i=0;i<n;i+=step){const e=new Date(B[i][0]);g.fillText(fvDaily()||FVOPT.view==="1mo"||FVOPT.view==="3mo"?e.toLocaleDateString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric"}):FVOPT.view==="5d"?e.toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"short"})+" "+e.toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric"}):e.toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}),X(i),Hh-5)}g.textAlign="left";
   FVH={B,X,Y,n,pl,pr,top,bot,vw};
   $("fvLeg").innerHTML=[FVOPT.vp?`<span><i style="background:${TH.accent}"></i>Value area (70%)</span><span><i style="background:${TH.violet}"></i>HVN: balance</span><span><i style="background:${TH.amber}"></i>LVN: air pocket</span>`:"",FVOPT.vwap&&vw?`<span><i style="background:${TH.amber}"></i>VWAP ±1σ ±2σ</span>`:"",FVOPT.ema?`<span><i style="background:${TH.up}"></i>EMA 9</span><span><i style="background:${TH.down}"></i>EMA 21</span>`:"",FVOPT.view!=="1y"?'<span class="sub">Shaded: extended hours</span>':""].join("");
 }
@@ -979,7 +989,7 @@ function fvDraw(s,S){
   cv.addEventListener("mouseleave",()=>tip.style.display="none")})();
 window.addEventListener("resize",()=>{if(curF)fvRender(true)});
 document.addEventListener("click",e=>{
-  const v=e.target.closest("[data-fvv]");if(v){FVOPT.view=v.dataset.fvv;lsSet("letf_fvopt",JSON.stringify(FVOPT));fvRender(true);return}
+  const v=e.target.closest("[data-fvv]");if(v){FVOPT.view=v.dataset.fvv;lsSet("letf_fvopt",JSON.stringify(FVOPT));if(curF)fvView(curF);fvRender(true);return}
   const o=e.target.closest("[data-fvo]");if(o){FVOPT[o.dataset.fvo]=!FVOPT[o.dataset.fvo];lsSet("letf_fvopt",JSON.stringify(FVOPT));fvRender(true);return}
   const go=e.target.closest("[data-go]");if(go){location.hash="#/f/"+go.dataset.go;return}
   if(e.target.id==="fwSave"&&curF){const n=x=>{const v=parseFloat($(x).value);return v>0?v:null};FW[curF]={above:n("fwA"),below:n("fwB"),move:n("fwM"),news:$("fwN").checked};if(!FW[curF].above&&!FW[curF].below&&!FW[curF].move&&!FW[curF].news)delete FW[curF];fwSave();$("fwMsg").textContent="Saved ✓";if(!WATCH.includes(curF)){WATCH.push(curF);saveW()}}
