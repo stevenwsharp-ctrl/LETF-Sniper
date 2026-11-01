@@ -562,7 +562,7 @@ function renderScanner(){
     `<select id="minDv">${[[0,"Any $ volume"],[1e5,"$100k+ traded"],[1e6,"$1M+ traded"],[1e7,"$10M+ traded"],[1e8,"$100M+ traded"]].map(([v,l])=>`<option value="${v}" ${+SC.minDv===v?"selected":""}>${l}</option>`).join("")}</select>`;
   const R=sorted(filtered());$("scanCount").textContent=`${UNI.length||"--"}`;
   const ph=phaseAt(Date.now()),showExt=ph!=="regular"||SC.tab==="ext";
-  const hdr=`<tr><th></th><th class="l">Fund</th><th>Lev.</th><th class="l">Underlying</th><th>Price</th><th>Day</th>${showExt?"<th>Ext. hours</th>":"<th>15 min</th>"}<th>Volume</th><th>$ traded</th><th class="l">Day range</th><th>vs implied</th><th class="l">Signals</th></tr>`;
+  const hdr=`<tr><th data-tip="watch"></th><th class="l">Fund</th><th>Lev.</th><th class="l">Underlying</th><th>Price</th><th>Day</th>${showExt?"<th>Ext. hours</th>":"<th>15 min</th>"}<th>Volume</th><th>$ traded</th><th class="l">Day range</th><th>vs implied</th><th class="l">Signals</th></tr>`;
   $("scanTbl").innerHTML=hdr+(R.slice(0,SC.n).map(r=>`<tr data-f="${r.s}">
     <td><span class="star ${WATCH.includes(r.s)?"on":""}" data-star="${r.s}" title="Watchlist">${WATCH.includes(r.s)?"★":"☆"}</span></td>
     <td class="l">${logoHtml(r.kind==="stock"&&r.u?r.u:r.s)}<b>${r.s}</b><div class="sub nm">${esc(r.n.slice(0,44))}</div></td>
@@ -884,8 +884,8 @@ function fvRadarHtml(s){const R=radarOf(s)||{},t=(k,v,sub,c)=>`<div class="st"><
 function fvUnderHtml(s){const f=UMAP[s]||{},r=ROWS.find(x=>x.s===s);
   if(!f.u){$("fvUnder").innerHTML='<span>Underlying</span><b>not identified</b>';$("fvSis").innerHTML="";return}
   const uq=QT[f.u];$("fvUnder").innerHTML=`<span>Underlying</span><b>${f.kind==="stock"?logoHtml(f.u)+"$"+f.u:esc(f.lab||f.u)+" ("+f.u+")"}</b><span>Underlying today</span><b class="${uq?cls(uq[1]):""}">${uq&&isNum(uq[1])?fmtPct(uq[1]/100,2):"--"}</b>
-   <span>Implied fund move (${levTxt(f.L)})</span><b>${r&&isFinite(r.imp)?fmtPct(r.imp,2):"--"}</b><span>Fund actual</span><b class="${r?cls(r.pct):""}">${r?fmtPct(r.pct,2):"--"}</b>
-   <span>Gap vs implied</span><b class="${r&&Math.abs(r.gap)>=0.01?cls(r.gap):""}">${r&&isFinite(r.gap)?fmtPct(r.gap,2):"--"}</b>`;
+   <span data-tip="implied">Implied fund move (${levTxt(f.L)})</span><b>${r&&isFinite(r.imp)?fmtPct(r.imp,2):"--"}</b><span>Fund actual</span><b class="${r?cls(r.pct):""}">${r?fmtPct(r.pct,2):"--"}</b>
+   <span data-tip="vs implied">Gap vs implied</span><b class="${r&&Math.abs(r.gap)>=0.01?cls(r.gap):""}">${r&&isFinite(r.gap)?fmtPct(r.gap,2):"--"}</b>`;
   const Sis=UNI.filter(x=>x.u===f.u).map(x=>ROWS.find(y=>y.s===x.s)||{...x,pct:NaN,dv:0}).sort((a,b)=>b.dv-a.dv);
   $("fvSis").innerHTML=`<tr><th class="l">Fund</th><th>Lev.</th><th>Price</th><th>Day</th><th>$ traded</th></tr>`+Sis.slice(0,14).map(x=>`<tr data-f="${x.s}" class="${x.s===s?"cur":""}"><td class="l"><b>${x.s}</b> <span class="sub">${esc((x.iss||"").slice(0,14))}</span></td><td><span class="levb ${x.L<0?"inv":""}">${levTxt(x.L)}</span></td><td>${fmtPx(x.last)}</td><td class="${cls(x.pct)}">${fmtPct(x.pct,1)}</td><td>${fmtBig(x.dv)}</td></tr>`).join("")}
 function fvDecayHtml(s){const f=UMAP[s]||{},d=FV[s]||{},L=f.L||0;
@@ -993,5 +993,44 @@ start().then(()=>{if(curF)fvLoad(curF,true)});
 el.onchange=()=>{const x=el.value;try{localStorage.setItem("site_width",x)}catch(e){}document.documentElement.style.setProperty("--pagew",x==="fit"?"100%":x+"px");window.dispatchEvent(new Event("resize"))}})();</script>
 <script src="sell.js?v=2"></script>
 <script src="terms.js?v=2"></script>
+
+<script>
+/* Column explanations: hover a column heading (or a label with a dotted underline) to see what it means. */
+(function(){
+const T={
+ "watch":"<b>Watchlist</b> — select ☆ to add the fund to your watchlist (alerts and the Watch tab). ★ = on your list.",
+ "Fund":"<b>Fund</b> — the leveraged or inverse ETF: ticker and name. Select a row to open the fund view with its chart, decay and sister funds.",
+ "Lev.":"<b>Leverage</b> — how many times the fund moves vs its underlying, <b>each day</b>. 2× = twice the daily move. −1×, −2×, −3× = inverse: the fund goes up when the underlying goes down. The daily reset makes long-term returns differ from 'leverage × the move' (decay).",
+ "Underlying":"<b>Underlying</b> — what the fund tracks (a stock, an index, a commodity or a currency) and its move today.",
+ "Price":"<b>Price</b> — the fund's last trade. A small dot = no trade in the last 30 minutes (thin trading).",
+ "Day":"<b>Day</b> — the fund's change today vs yesterday's close.",
+ "15 min":"<b>15 min</b> — the fund's move in the last 15 minutes. A large value = a fast move happening now.",
+ "Ext. hours":"<b>Extended hours</b> — the fund's move in pre-market (4:00–9:30 am ET) or after-hours (4:00–8:00 pm ET) vs the regular close.",
+ "Volume":"<b>Volume</b> — shares traded today. <b>N×</b> = the trading pace in the last 15 minutes vs the day's average pace (shown at 1.5× or more): a surge of interest.",
+ "$ traded":"<b>$ traded</b> — dollar volume today (price × shares). Higher = easier to buy and sell, with tighter spreads.",
+ "Day range":"<b>Day range</b> — where the price sits inside today's low–high range. The marker on the left = at the day's low; on the right = at the day's high.",
+ "vs implied":"<b>vs implied</b> — the fund's move today <b>minus</b> the move its leverage implies (leverage × the underlying's move).<br>Example: the stock is up 5% and the fund is 2× → implied +10%. If the fund is up 10.3%, this shows <b>+0.3%</b>.<br><b>+</b> = the fund is ahead of its underlying (rich) · <b>−</b> = behind (cheap). Gaps under 1% are normal and shown in grey. Larger gaps come from a premium or discount to the fund's value, prices taken at slightly different moments, or heavy buying or selling of the fund itself. A big gap often closes.",
+ "implied":"<b>Implied fund move</b> — what the fund 'should' have done today: leverage × the underlying's move.",
+ "Signals":"<b>Signals</b> — what stands out for this fund now (hover an icon for its number):<br>🔥 very big move today (20%+ for single-stock funds, 10%+ for index funds)<br>⚡ big move (10%+ / 5%+)<br>🚀 fast move: 4%+ / 2%+ in the last 15 minutes<br>📈 volume surge: trading 3× faster than the day's average<br>⬆ at the day's high (and up 3%+) · ⬇ at the day's low (and down 3%+)<br>🌙 big extended-hours move (5%+)",
+ "Move":"<b>Move</b> — the underlying's change today.",
+ "Best long fund":"<b>Best long fund</b> — the most traded fund that goes <b>up</b> with this underlying, and its move today.",
+ "Best inverse fund":"<b>Best inverse fund</b> — the most traded fund that goes <b>down</b> when this underlying goes up, and its move today.",
+ "Funds":"<b>Funds</b> — how many leveraged or inverse ETFs track this underlying."
+};
+const st=document.createElement("style");st.textContent=`.coltip{position:fixed;z-index:9999;max-width:340px;background:var(--panel2,#131a24);color:var(--ink,#e6edf5);border:1px solid var(--line,#1e2835);border-radius:10px;padding:9px 11px;font:12.5px/1.45 var(--sans,system-ui);box-shadow:0 8px 24px rgba(0,0,0,.35);pointer-events:none;opacity:0;transition:opacity .08s}
+.coltip.on{opacity:1}.coltip b{color:var(--ink,#fff)}th.hastip,[data-tip]{cursor:help}th.hastip{text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,currentColor 45%,transparent);text-underline-offset:3px}[data-tip]{border-bottom:1px dotted color-mix(in srgb,currentColor 45%,transparent)}`;document.head.appendChild(st);
+const tip=document.createElement("div");tip.className="coltip";document.body.appendChild(tip);
+const keyOf=el=>el.dataset.tip!=null?el.dataset.tip:el.textContent.replace(/\s+/g," ").trim();
+// mark the headings that have an explanation (tables are rebuilt often, so check after each change)
+const mark=()=>document.querySelectorAll("th").forEach(th=>{if(T[keyOf(th)]!=null&&!th.classList.contains("hastip"))th.classList.add("hastip")});
+new MutationObserver(()=>{clearTimeout(mark.t);mark.t=setTimeout(mark,50)}).observe(document.body,{childList:true,subtree:true});mark();
+let cur=null;
+function place(e){const r=tip.getBoundingClientRect(),W=innerWidth,H=innerHeight;let x=e.clientX+14,y=e.clientY+16;if(x+r.width>W-8)x=Math.max(8,e.clientX-r.width-14);if(y+r.height>H-8)y=Math.max(8,e.clientY-r.height-14);tip.style.left=x+"px";tip.style.top=y+"px"}
+document.addEventListener("mouseover",e=>{const el=e.target.closest("th,[data-tip]");if(!el){if(cur){cur=null;tip.classList.remove("on")}return}
+  const t=T[keyOf(el)];if(t==null){cur=null;tip.classList.remove("on");return}if(el!==cur){cur=el;tip.innerHTML=t}tip.classList.add("on");place(e)});
+document.addEventListener("mousemove",e=>{if(cur)place(e)});
+document.addEventListener("scroll",()=>{cur=null;tip.classList.remove("on")},true);
+})();
+</script>
 </body>
 </html>
