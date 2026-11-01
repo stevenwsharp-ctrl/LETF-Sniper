@@ -501,10 +501,21 @@ var UNI=[],UMAP={},QT={},QAT=0,QERR="",SNAP={},health={lastData:0,ticks:0};
 const KIND_LAB={stock:"Single stock",index:"Index & sector",crypto:"Crypto",commodity:"Commodity",rates:"Rates",volatility:"Volatility",unknown:"Other"};
 async function loadUniverse(force){
   if(demo){UNI=demoUniverse();UMAP={};UNI.forEach(f=>UMAP[f.s]=f);return}
-  try{const c=JSON.parse(lsGet("letf_list")||"null");if(c&&!force&&Date.now()-c.at<12*3600000&&c.funds.length>100){UNI=c.funds;UMAP={};UNI.forEach(f=>UMAP[f.s]=f);return}}catch(e){}
+  try{const c=JSON.parse(lsGet("letf_list")||"null");if(c&&!force&&Date.now()-c.at<12*3600000&&c.funds.length>100){UNI=c.funds;UMAP={};UNI.forEach(f=>UMAP[f.s]=f);await fixUniverse();return}}catch(e){}
   const p=proxy();if(!p)return;
-  try{const j=await(await fetch(p+"/letf/list")).json();if(j.status==="ok"){UNI=j.funds;UMAP={};UNI.forEach(f=>UMAP[f.s]=f);lsSet("letf_list",JSON.stringify({at:Date.now(),funds:UNI}))}else QERR=j.error||"list error"}
+  try{const j=await(await fetch(p+"/letf/list")).json();if(j.status==="ok"){UNI=j.funds;UMAP={};UNI.forEach(f=>UMAP[f.s]=f);lsSet("letf_list",JSON.stringify({at:Date.now(),funds:UNI}));await fixUniverse()}else QERR=j.error||"list error"}
   catch(e){QERR="The Worker did not answer /letf/list (deploy the new Worker code)"}
+}
+/* Second source check: the Nasdaq ETF feed sometimes carries a wrong fund name (for example AXTQ listed as "2X Long CIEN",
+   really "2X Short AXTI"). Cohort Sniper's data job keeps a separate list of the leveraged ETFs (instruments.json); when the
+   two names disagree, use that name and read leverage, direction and the underlying ticker from it. */
+async function fixUniverse(){
+  try{const r=await fetch("https://raw.githubusercontent.com/stevenwsharp-ctrl/Hyperdash-Cohort-Tracker/data/instruments.json?t="+Math.floor(Date.now()/36e5));if(!r.ok)return;const I=await r.json(),N={};
+    Object.values(I.m||{}).forEach(v=>(v.lev||[]).forEach(x=>{N[x.s]=x}));let n=0;
+    UNI.forEach(f=>{const x=N[f.s];if(!x||!x.n||x.n===f.n)return;const m=x.n.match(/(\d(?:\.\d+)?)X\s+(Long|Short|Inverse|Bull|Bear)\s+([A-Z]{1,5})\b/i);
+      const L=x.x&&x.d?x.x*x.d:m?(+m[1])*(/short|inverse|bear/i.test(m[2])?-1:1):f.L,u=m&&m[3]&&!/^(DAILY|ETF|SHARES|THE)$/i.test(m[3])?m[3].toUpperCase():null;
+      if(u&&f.kind==="stock"||u&&f.kind==="unknown"){f.fix={n:f.n,u:f.u,L:f.L};f.n=x.n;f.L=L;f.u=u;f.kind="stock";n++}});
+    if(n)console.log("LETF list: corrected "+n+" fund names from the second source")}catch(e){}
 }
 async function loadQuotes(){
   if(demo){demoTick();return}
@@ -574,7 +585,7 @@ function renderScanner(){
   const hdr=`<tr><th data-tip="watch"></th>${sh("fund","Fund","l")}${sh("lev","Lev.")}${sh("under","Underlying","l")}${sh("price","Price")}${sh("day","Day")}${showExt?sh("ext","Ext. hours"):sh("m15","15 min")}${sh("vol","Volume")}${sh("dv","$ traded")}${sh("range","Day range","l")}${sh("gap","vs implied")}${sh("sig","Signals","l")}</tr>`;
   $("scanTbl").innerHTML=hdr+(R.slice(0,SC.n).map(r=>`<tr data-f="${r.s}">
     <td><span class="star ${WATCH.includes(r.s)?"on":""}" data-star="${r.s}" title="Watchlist">${WATCH.includes(r.s)?"★":"☆"}</span></td>
-    <td class="l">${logoHtml(r.kind==="stock"&&r.u?r.u:r.s)}<b>${r.s}</b><div class="sub nm">${esc(r.n.slice(0,44))}</div></td>
+    <td class="l">${logoHtml(r.kind==="stock"&&r.u?r.u:r.s)}<b>${r.s}</b><div class="sub nm">${esc(r.n.slice(0,44))}${r.fix?` <span title="Corrected: the Nasdaq feed listed this fund as '${esc(r.fix.n)}'. The name, leverage and underlying here come from a second source." style="color:var(--amber,#f5b041)">✓ fixed</span>`:""}</div></td>
     <td><span class="levb ${r.L<0?"inv":""}">${levTxt(r.L)}</span></td>
     <td class="l">${r.u&&r.kind==="stock"?`<b>${esc(r.u)}</b>`:esc(r.lab||"--")} <span class="${cls(r.upct)}">${isFinite(r.upct)?fmtPct(r.upct,1):""}</span></td>
     <td>${fmtPx(r.last)}${r.stale?' <span class="sub" title="Last trade over 30 min ago">·</span>':""}</td>
