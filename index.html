@@ -797,7 +797,7 @@ function setupOf(s){
   const k=Math.sign(f.L),map=p=>p==null||!isFinite(p)?null:F.last*(1+f.L*(p/U.last-1)),side=U.side*k;
   let verdict=U.verdict,vc=U.vc;if(k<0){verdict=verdict.replace(/LONG/g,"§").replace(/SHORT/g,"LONG").replace(/§/g,"SHORT");vc=vc==="up"?"down":vc==="down"?"up":vc}
   const inv=side<0?UNI.filter(x=>x.u&&x.u===f.u&&Math.sign(x.L)!==Math.sign(f.L)).sort((a,b)=>((QT[b.s]||[])[2]||0)*((QT[b.s]||[])[0]||0)-((QT[a.s]||[])[2]||0)*((QT[a.s]||[])[0]||0))[0]:null;
-  const plan=U.plan?{side,entry:F.last,tgt:map(U.plan.tgt),stop:map(U.plan.stop),rr:U.plan.rr,ext:U.plan.ext,inv}:null;
+  const plan=U.plan?{side,entry:map(U.plan.limit),limit:map(U.plan.limit),now:F.last,fillP:U.plan.fillP,tgt:map(U.plan.tgt),stop:map(U.plan.stop),rr:U.plan.rr,ext:U.plan.ext,inv}:null;
   return{...F,side,verdict,vc,st:U.st,tr:U.tr,mo:U.mo,loc:{k:U.loc.k,t:"$"+f.u+": "+U.loc.t},plan,nUp:k>0?map(U.nUp):map(U.nDn),nDn:k>0?map(U.nDn):map(U.nUp),U,src:f.u,fund:F}
 }
 function setupCore(d,last,s){
@@ -827,7 +827,10 @@ function setupCore(d,last,s){
   let plan=null;
   if(side){const range=VP.hi-VP.lo;let tgt=side>0?nUp:nDn,ext=false;if(tgt==null){const pr=(d.bd||[]).slice(-30),da=pr.length>15?atr(pr,14):NaN,mv=Math.min(range*0.382,isFinite(da)?da:Infinity);tgt=side>0?Math.max(last,VP.hi)+mv:Math.min(last,VP.lo)-mv;ext=true}
     let stop=side>0?(nDn!=null?nDn-buf:VP.lo-buf):(nUp!=null?nUp+buf:VP.hi+buf);
-    const risk=Math.abs(last-stop),rew=Math.abs(tgt-last),rr=risk>0?rew/risk:NaN;plan={side,entry:last,tgt,stop,rr,ext,
+    /* entry is a LIMIT order on a small pullback (0.5 × 5-min ATR, never past the stop), alive 60 minutes; the plan (and its test) starts only when price touches it */
+    let lim=last-side*0.5*a5;if(side>0?lim<=stop:lim>=stop)lim=(last+stop)/2;
+    let fh=0,fn=0;const C=d.b5;for(let i=Math.max(20,C.length-400);i<C.length-12;i++){const lv=C[i][4]-side*0.5*a5;fn++;for(let k=i+1;k<=i+12;k++)if(side>0?C[k][3]<=lv:C[k][2]>=lv){fh++;break}}
+    const risk=Math.abs(lim-stop),rew=Math.abs(tgt-lim),rr=risk>0?rew/risk:NaN;plan={side,entry:lim,limit:lim,now:last,fillP:fn>=30?fh/fn:null,tgt,stop,rr,ext,
       inv:s&&UMAP[s]?UNI.filter(f=>f.u&&f.u===UMAP[s].u&&Math.sign(f.L)!==Math.sign(UMAP[s].L)).sort((a,b)=>((QT[b.s]||[])[2]||0)*((QT[b.s]||[])[0]||0)-((QT[a.s]||[])[2]||0)*((QT[a.s]||[])[0]||0))[0]:null}}
   return{last,VP,st,tr,mo,loc,verdict,vc,side,plan,nUp,nDn,rsi:r,a5}
 }
@@ -918,7 +921,7 @@ function fvSetupHtml(s,S){
    <div>${ic(S.mo)} <b>Momentum</b> <span class="sub">${esc(S.mo.t)}</span></div></div>
    <div class="kv" style="margin-top:10px"><span>Next HVN up</span><b>${S.nUp!=null?fmtPx(S.nUp)+" ("+fmtPct(S.nUp/S.last-1,1)+")":"none · open air above"}</b><span>Next HVN down</span><b>${S.nDn!=null?fmtPx(S.nDn)+" ("+fmtPct(S.nDn/S.last-1,1)+")":"none · open air below"}</b>
    <span>POC · value area (5 days)</span><b>${fmtPx(S.VP.poc)} · ${fmtPx(S.VP.val)}–${fmtPx(S.VP.vah)}</b></div>
-   ${P?`<div class="plan ${P.side>0?"pos":"neg"}"><div class="label" style="margin:0 0 4px">Plan · level to level</div><div class="kv"><span>Entry (now)</span><b>${fmtPx(P.entry)}</b><span>Target ${P.ext?"(range extension)":"(next HVN)"}</span><b class="${P.side>0?"up":"down"}">${fmtPx(P.tgt)} (${fmtPct(P.tgt/P.entry-1,1)})</b><span>Stop (past the HVN behind)</span><b>${fmtPx(P.stop)} (${fmtPct(P.stop/P.entry-1,1)})</b><span>Reward : risk</span><b class="${P.rr>=2?"up":P.rr<1?"down":""}">${isFinite(P.rr)?P.rr.toFixed(2)+" : 1":"--"}</b></div>
+   ${P?`<div class="plan ${P.side>0?"pos":"neg"}"><div class="label" style="margin:0 0 4px">Plan · level to level · limit entry, valid 60 minutes, cancel if not touched</div><div class="kv"><span>Limit ${P.side>0?"buy":"sell"} (entry)</span><b>${fmtPx(P.entry)} (${fmtPct(P.entry/(P.now||P.entry)-1,2)} from now)${P.fillP!=null?` · fills ~${Math.round(P.fillP*100)}% of the time within an hour`:""}</b><span>Limit exit ${P.ext?"(range extension)":"(next HVN)"}</span><b class="${P.side>0?"up":"down"}">${fmtPx(P.tgt)} (${fmtPct(P.tgt/P.entry-1,1)})</b><span>Stop at market (the level behind failed)</span><b>${fmtPx(P.stop)} (${fmtPct(P.stop/P.entry-1,1)})</b><span>Reward : risk</span><b class="${P.rr>=2?"up":P.rr<1?"down":""}">${isFinite(P.rr)?P.rr.toFixed(2)+" : 1":"--"}</b></div>
      ${P.rr<1.5?'<div class="sub" style="margin-top:6px">Reward is small for the risk. The method waits for a better location (the edge of a node).</div>':""}
      ${P.side<0&&P.inv?`<div class="sub" style="margin-top:6px">A short read on this fund: the inverse sister is <span class="lnk" data-go="${P.inv.s}">$${P.inv.s}</span> (${levTxt(P.inv.L)}).</div>`:""}</div>`:'<div class="sub" style="margin-top:8px">No plan until the filters agree. Price moves from node to node; wait for structure, trend and momentum to line up.</div>'}`;
 }
@@ -1045,7 +1048,7 @@ start().then(()=>{if(curF)fvLoad(curF,true)});
 <script src="pb.js?v=1"></script>
 <script src="markov.js?v=1"></script>
 <script src="matrix.js?v=1"></script>
-<script src="planner.js?v=1"></script>
+<script src="planner.js?v=3"></script>
 <script src="letfweb.js?v=2"></script>
 <script>(function(){const el=document.getElementById("widthSel");if(!el)return;let v="fit";try{v=localStorage.getItem("site_width")||"fit"}catch(e){}el.value=v;
 el.onchange=()=>{const x=el.value;try{localStorage.setItem("site_width",x)}catch(e){}document.documentElement.style.setProperty("--pagew",x==="fit"?"100%":x+"px");window.dispatchEvent(new Event("resize"))}})();</script>
