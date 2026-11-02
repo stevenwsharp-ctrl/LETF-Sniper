@@ -512,9 +512,10 @@ async function loadUniverse(force){
 async function fixUniverse(){
   try{const r=await fetch("https://raw.githubusercontent.com/stevenwsharp-ctrl/Hyperdash-Cohort-Tracker/data/instruments.json?t="+Math.floor(Date.now()/36e5));if(!r.ok)return;const I=await r.json(),N={};
     Object.values(I.m||{}).forEach(v=>(v.lev||[]).forEach(x=>{N[x.s]=x}));let n=0;
-    UNI.forEach(f=>{const x=N[f.s];if(!x||!x.n||x.n===f.n)return;const m=x.n.match(/(\d(?:\.\d+)?)X\s+(Long|Short|Inverse|Bull|Bear)\s+([A-Z]{1,5})\b/i);
+    const pick=(s,name)=>{const all=[...name.matchAll(/([\w.&'-]+\s+)?(\d(?:\.\d+)?)X\s+(Long|Short|Inverse|Bull|Bear)\s+([A-Z]{1,5})\b[^]*?(?:ETF|Fund|Shares)?(?=\s+[\w.&'-]+\s+\d(?:\.\d+)?X\s|$)/gi)];if(all.length<2)return null;const sc=u=>{let k=0;while(k<u.length&&k<s.length&&u[k]===s[k])k++;return k};const b=all.map(m=>({m,k:sc(m[4].toUpperCase())})).sort((a,b)=>b.k-a.k)[0];return b.k>=2?b.m:null};
+    UNI.forEach(f=>{const x0=N[f.s];if(!x0||!x0.n)return;const pk=pick(f.s,x0.n),x=pk?{...x0,n:pk[0].trim(),x:null}:x0;if(x.n===f.n)return;const m=pk?[pk[0],pk[2],pk[3],pk[4]]:x.n.match(/(\d(?:\.\d+)?)X\s+(Long|Short|Inverse|Bull|Bear)\s+([A-Z]{1,5})\b/i);
       const L=x.x&&x.d?x.x*x.d:m?(+m[1])*(/short|inverse|bear/i.test(m[2])?-1:1):f.L,u=m&&m[3]&&!/^(DAILY|ETF|SHARES|THE)$/i.test(m[3])?m[3].toUpperCase():null;
-      if(u&&f.kind==="stock"||u&&f.kind==="unknown"){f.fix={n:f.n,u:f.u,L:f.L};f.n=x.n;f.L=L;f.u=u;f.kind="stock";n++}});
+      if(u&&f.kind==="stock"||u&&f.kind==="unknown"||pk&&u){f.fix={n:f.n,u:f.u,L:f.L};f.n=x.n;f.L=L;f.u=u;f.kind="stock";n++}});
     if(n)console.log("LETF list: corrected "+n+" fund names from the second source")}catch(e){}
 }
 async function loadQuotes(){
@@ -893,7 +894,9 @@ function fvRender(full){
 function fvSetupHtml(s,S){
   const d=FV[s]||{};if(!S){$("fvSetup").innerHTML=`<div class="sub">${d.err?esc(d.err):"Loading bars… (the setup needs about 30 five-minute bars)"}</div>`;return}
   const ic=x=>x.d>0?'<b class="up">▲</b>':x.d<0?'<b class="down">▼</b>':'<b class="sub">●</b>',P=S.plan;
-  $("fvSetup").innerHTML=`<div class="verdict ${S.vc}">${S.verdict}</div>
+  const fF=UMAP[s]||{},und=fF.u?(fF.kind==="stock"?"$"+fF.u:(fF.lab||fF.u)):"the index",sd=S.side;
+  const what=!sd?"":fF.L<0?(sd>0?`Buy $${s} = a bet that ${und} <b class="down">falls</b> (this fund moves ${levTxt(fF.L)} opposite ${und}).`:`Sell or avoid $${s} = a bet that ${und} <b class="up">rises</b> (this fund moves ${levTxt(fF.L)} opposite ${und}).`):(fF.L>0?(sd>0?`Buy $${s} = a bet that ${und} <b class="up">rises</b> (${levTxt(fF.L)}).`:`Sell or avoid $${s} = a bet that ${und} <b class="down">falls</b> (${levTxt(fF.L)}).`):"");
+  $("fvSetup").innerHTML=`<div class="verdict ${S.vc}">${S.verdict.replace(/^(LONG SETUP|SHORT SETUP|LEAN LONG|LEAN SHORT)/,"$1 $"+s)}</div>${what?`<div class="sub" style="margin:6px 0 2px;font-size:13px">The setup reads this fund's own chart. ${what}</div>`:""}
    <div class="loc">${esc(S.loc.t)}</div>
    <div class="filt"><div>${ic(S.st)} <b>Structure</b> <span class="sub">${esc(S.st.t)}</span></div>
    <div>${ic(S.tr)} <b>Trend</b> <span class="sub">30 min ${S.tr.t30.d>0?"up":S.tr.t30.d<0?"down":"mixed"} · 1 hour ${S.tr.t60.d>0?"up":S.tr.t60.d<0?"down":"mixed"}</span></div>
