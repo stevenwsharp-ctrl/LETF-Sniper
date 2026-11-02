@@ -31,8 +31,8 @@
   // shared setups (agree.js): the lab's 24 h / 48 h / 7 d setups for this fund's underlying, converted through the fund's leverage
   const setupCard = document.getElementById("fvSetup"); let ag = null;
   if (setupCard && window.Agree) { ag = document.createElement("div"); ag.id = "fvAgree"; ag.style.marginTop = "12px"; setupCard.closest(".card").appendChild(ag); }
-  async function drawAgree() { if (!ag || typeof curF === "undefined" || !curF) return; await Agree.load(); const f = UMAP[curF] || {}, q = QT[curF];
-    ag.innerHTML = `<div class="label" style="margin:0 0 4px">Same setups on every site · 24 h / 48 h / 7 days (SOXX Sniper and Cohort Sniper show these exact numbers)</div>${Agree.html(f.u, { L: f.L, px: q && q[0] > 0 ? q[0] : null, s: "$" + curF })}${f.u ? Agree.table(f.u, [["$" + curF, f.u, f.L || 1]]) : ""}`; }
+  async function drawAgree() { if (!ag || typeof curF === "undefined" || !curF) return; await Agree.load(); const f = UMAP[curF] || {}, q = QT[curF]; if (f.u) await Agree.intra(f.u);
+    ag.innerHTML = `<div class="label" style="margin:0 0 4px">Same setups on every site · 15 min to 7 days (SOXX Sniper and Cohort Sniper show these exact numbers)</div>${Agree.html(f.u, { L: f.L, px: q && q[0] > 0 ? q[0] : null, s: "$" + curF })}${f.u ? Agree.table(f.u, [["$" + curF, f.u, f.L || 1]]) : ""}`; }
   setInterval(() => { if (!document.hidden) drawAgree(); }, 30000); document.addEventListener("click", () => setTimeout(drawAgree, 1500));
   const under = document.getElementById("fvUnder"); let fc = null;
   if (under) { fc = document.createElement("div"); fc.id = "fvWeb"; fc.style.marginTop = "10px"; under.closest(".card").appendChild(fc); }
