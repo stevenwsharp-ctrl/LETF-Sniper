@@ -36,5 +36,9 @@
     try { if (fc && typeof curF !== "undefined" && curF) { const f = UMAP[curF] || {}, a = rep[f.u] || curF, h = Web.forecastHtml(a); fc.innerHTML = h ? `<div class="label" style="margin:6px 0 4px">🕸 Signal web on $${f.u || curF} (via $${a})</div>${h}` : `<div class="sub" style="font-size:12px">🕸 The signal web has no forecast for $${f.u || curF} yet: it starts learning this asset now.</div>`; } } catch (e) { }
   }
   setTimeout(feed, 20000); setInterval(feed, 60000);
+  // knowledge hub: a card under the web, and test-runner tasks: the engines on the 25 most traded underlyings (2 years of daily bars)
+  try { if (window.Hub) { Hub.card(wc || document.getElementById("scanCard"), "hubCard");
+    setTimeout(() => { const G = {}; (ROWS || []).forEach(r => { if (r.u && r.dv > 0) G[r.u] = (G[r.u] || 0) + r.dv; });
+      Object.entries(G).sort((a, b) => b[1] - a[1]).slice(0, 25).forEach(([u]) => Hub.task("LETF · engines on " + u, async () => { const j = await getChart(/\.X$/.test(u) ? u.replace(/\.X$/, "-USD") : u, "2y", "1d"); return j.bars && j.bars.length >= 400 ? Hub.battery(j.bars.map(b => [b[0], b[1], b[2], b[3], b[4], b[5] || 0]), u, { daily: true }) : null; })); }, 40000); } } catch (e) { }
   document.addEventListener("click", () => setTimeout(draw, 300));
 })();
