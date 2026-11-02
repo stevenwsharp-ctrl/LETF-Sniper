@@ -914,6 +914,7 @@ function fvSetupHtml(s,S){
   const ic=x=>x.d>0?'<b class="up">▲</b>':x.d<0?'<b class="down">▼</b>':'<b class="sub">●</b>',P=S.plan;
   const fF=UMAP[s]||{},und=fF.u?(fF.kind==="stock"?"$"+fF.u:(fF.lab||fF.u)):"the index",sd=S.side;
   const what=!sd?"":fF.L<0?(sd>0?`Buy $${s} = a bet that ${und} <b class="down">falls</b> (this fund moves ${levTxt(fF.L)} opposite ${und}).`:`Sell or avoid $${s} = a bet that ${und} <b class="up">rises</b> (this fund moves ${levTxt(fF.L)} opposite ${und}).`):(fF.L>0?(sd>0?`Buy $${s} = a bet that ${und} <b class="up">rises</b> (${levTxt(fF.L)}).`:`Sell or avoid $${s} = a bet that ${und} <b class="down">falls</b> (${levTxt(fF.L)}).`):"");
+  try{if(window.Agree&&S.U&&S.src)Agree.publish("LETF Sniper · level-to-level",S.src,{side:S.U.side,h:"1 h (5-min bars)",txt:S.U.verdict})}catch(e){}
   $("fvSetup").innerHTML=`<div class="verdict ${S.vc}">${S.verdict.replace(/^(LONG SETUP|SHORT SETUP|LEAN LONG|LEAN SHORT)/,"$1 $"+s)}</div>${S.src?`<div class="sub" style="margin:6px 0 2px;font-size:13px">Read from <b>$${esc(S.src)}</b>'s own chart (the asset this fund tracks), so every $${esc(S.src)} fund shows the same setup: $${esc(S.src)} itself is <b class="${S.U.side>0?"up":S.U.side<0?"down":""}">${S.U.side>0?"leaning up":S.U.side<0?"leaning down":"undecided"}</b>${S.U.side?`; long funds ${S.U.side>0?"buy":"avoid"}, inverse funds ${S.U.side>0?"avoid":"buy"}`:""}. Levels are mapped to this fund through its leverage. ${what}</div>`:what?`<div class="sub" style="margin:6px 0 2px;font-size:13px">No underlying chart: the setup reads this fund's own chart. ${what}</div>`:""}
    <div class="loc">${esc(S.loc.t)}</div>
    <div class="filt"><div>${ic(S.st)} <b>Structure</b> <span class="sub">${esc(S.st.t)}</span></div>
@@ -1043,13 +1044,14 @@ start().then(()=>{if(curF)fvLoad(curF,true)});
 </script>
 <script src="web.js?v=1"></script>
 <script src="hub.js?v=1"></script>
+<script src="agree.js?v=1"></script>
 <script src="idx.js?v=1"></script>
 <script src="vflow.js?v=1"></script>
 <script src="pb.js?v=1"></script>
 <script src="markov.js?v=1"></script>
 <script src="matrix.js?v=1"></script>
 <script src="planner.js?v=3"></script>
-<script src="letfweb.js?v=2"></script>
+<script src="letfweb.js?v=3"></script>
 <script>(function(){const el=document.getElementById("widthSel");if(!el)return;let v="fit";try{v=localStorage.getItem("site_width")||"fit"}catch(e){}el.value=v;
 el.onchange=()=>{const x=el.value;try{localStorage.setItem("site_width",x)}catch(e){}document.documentElement.style.setProperty("--pagew",x==="fit"?"100%":x+"px");window.dispatchEvent(new Event("resize"))}})();</script>
 <script src="sell.js?v=2"></script>
