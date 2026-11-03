@@ -545,6 +545,7 @@ function rowOf(f){
   if(pace>=3&&dv>2e5)r.sig.push(["📈","volume surge "+pace.toFixed(1)+"×"]);
   if(r.pos>=0.98&&pct>0.03)r.sig.push(["⬆","at day high"]);else if(r.pos<=0.02&&pct<-0.03)r.sig.push(["⬇","at day low"]);
   if(ext&&Math.abs(ext.pct)>=0.05)r.sig.push(["🌙","extended hours "+fmtPct(ext.pct,1)]);
+  try{if(window.revRow)revRow(r)}catch(e){}   // rev.js: 1-min and 5-min moves, hard reversal reading
   return r;
 }
 var ROWS=[];function buildRows(){ROWS=UNI.map(rowOf).filter(Boolean);return ROWS}
@@ -553,7 +554,7 @@ var ROWS=[];function buildRows(){ROWS=UNI.map(rowOf).filter(Boolean);return ROWS
 var SC={tab:"gain",kind:"all",dir:"all",lev:"all",minDv:1e6,q:"",n:50};try{Object.assign(SC,JSON.parse(lsGet("letf_sc")||"{}"),{q:"",n:50})}catch(e){}
 var WATCH=[];try{WATCH=JSON.parse(lsGet("letf_watch")||"[]")||[]}catch(e){WATCH=[]}
 const saveSC=()=>lsSet("letf_sc",JSON.stringify(SC)),saveW=()=>lsSet("letf_watch",JSON.stringify(WATCH));
-const TABS=[["gain","Top gainers"],["lose","Top losers"],["active","Most traded ($)"],["mom","Momentum 15m"],["surge","Volume surge"],["ext","Extended hours"],["high","At day high"],["all","All"]];
+const TABS=[["gain","Top gainers"],["lose","Top losers"],["active","Most traded ($)"],["rev","⤾ Reversals"],["fast","Fast 1m / 5m"],["mom","Momentum 15m"],["surge","Volume surge"],["ext","Extended hours"],["high","At day high"],["all","All"]];
 function filtered(){
   const q=SC.q.trim().toUpperCase();
   return ROWS.filter(r=>{if(SC.kind!=="all"&&r.kind!==SC.kind)return false;if(SC.dir==="long"&&r.L<0)return false;if(SC.dir==="inv"&&r.L>0)return false;
@@ -561,9 +562,9 @@ function filtered(){
     if(q&&!(r.s.includes(q)||(r.u||"").toUpperCase().includes(q)||(r.lab||"").toUpperCase().includes(q)||r.n.toUpperCase().includes(q)))return false;return true});
 }
 function sorted(L){
-  const by={gain:(a,b)=>b.pct-a.pct,lose:(a,b)=>a.pct-b.pct,active:(a,b)=>b.dv-a.dv,mom:(a,b)=>Math.abs(b.m15||0)-Math.abs(a.m15||0),surge:(a,b)=>(b.pace||0)-(a.pace||0),
+  const by={gain:(a,b)=>b.pct-a.pct,lose:(a,b)=>a.pct-b.pct,active:(a,b)=>b.dv-a.dv,mom:(a,b)=>Math.abs(b.m15||0)-Math.abs(a.m15||0),rev:(a,b)=>(b.rev?b.rev.score:0)-(a.rev?a.rev.score:0),fast:(a,b)=>Math.max(Math.abs(b.m1||0)*3,Math.abs(b.m5||0))-Math.max(Math.abs(a.m1||0)*3,Math.abs(a.m5||0)),surge:(a,b)=>(b.pace||0)-(a.pace||0),
     ext:(a,b)=>Math.abs(b.ext?b.ext.pct:0)-Math.abs(a.ext?a.ext.pct:0),high:(a,b)=>(b.pos||0)*b.pct-(a.pos||0)*a.pct,all:(a,b)=>a.s<b.s?-1:1}[SC.tab];
-  let R=L.filter(r=>isFinite(r.pct));if(SC.tab==="ext")R=R.filter(r=>r.ext);if(SC.tab==="mom")R=R.filter(r=>isFinite(r.m15));if(SC.tab==="surge")R=R.filter(r=>isFinite(r.pace));if(SC.tab==="high")R=R.filter(r=>r.pos>=0.9&&r.pct>0);
+  let R=L.filter(r=>isFinite(r.pct));if(SC.tab==="ext")R=R.filter(r=>r.ext);if(SC.tab==="mom")R=R.filter(r=>isFinite(r.m15));if(SC.tab==="rev")R=R.filter(r=>r.rev&&r.rev.score>=0.6);if(SC.tab==="fast")R=R.filter(r=>isFinite(r.m1)||isFinite(r.m5));if(SC.tab==="surge")R=R.filter(r=>isFinite(r.pace));if(SC.tab==="high")R=R.filter(r=>r.pos>=0.9&&r.pct>0);
   R.sort(by);
   // column sort (click a heading): applied after the tab's own filter and order; blank values always go last
   const C=SC.col&&COLS[SC.col];if(C){const d=SC.cdir||1;R.sort((a,b)=>{const x=C.v(a),y=C.v(b),bx=x==null||(typeof x==="number"&&!isFinite(x)),by2=y==null||(typeof y==="number"&&!isFinite(y));
@@ -571,7 +572,7 @@ function sorted(L){
   return R;
 }
 // sortable columns: value for each row, and the first direction (1 = low to high / A to Z, -1 = high to low)
-const COLS={fund:{v:r=>r.s,d:1},lev:{v:r=>r.L,d:-1},under:{v:r=>r.upct,d:-1},price:{v:r=>r.last,d:-1},day:{v:r=>r.pct,d:-1},m15:{v:r=>r.m15,d:-1},ext:{v:r=>r.ext?r.ext.pct:NaN,d:-1},
+const COLS={fund:{v:r=>r.s,d:1},lev:{v:r=>r.L,d:-1},under:{v:r=>r.upct,d:-1},price:{v:r=>r.last,d:-1},day:{v:r=>r.pct,d:-1},m1:{v:r=>r.m1,d:-1},m5:{v:r=>r.m5,d:-1},m15:{v:r=>r.m15,d:-1},rev:{v:r=>r.rev?r.rev.score*r.rev.dir:NaN,d:-1},ext:{v:r=>r.ext?r.ext.pct:NaN,d:-1},
   vol:{v:r=>r.vol,d:-1},dv:{v:r=>r.dv,d:-1},range:{v:r=>r.pos,d:-1},gap:{v:r=>r.gap,d:-1},sig:{v:r=>r.sig.length?r.sig.length+Math.min(0.99,Math.abs(r.pct)):0,d:-1}};
 function renderScanner(){
   $("scanTabs").innerHTML=TABS.map(([k,l])=>`<button data-tab="${k}" class="${SC.tab===k?"on":""}">${l}</button>`).join("");
@@ -583,7 +584,7 @@ function renderScanner(){
   const R=sorted(filtered());$("scanCount").textContent=`${UNI.length||"--"}`;
   const ph=phaseAt(Date.now()),showExt=ph!=="regular"||SC.tab==="ext";
   const sh=(k,lab,cl)=>`<th class="${cl||""} srt${SC.col===k?" on":""}" data-scol="${k}">${lab}<span class="sarr">${SC.col===k?(SC.cdir>0?" ▲":" ▼"):""}</span></th>`;
-  const hdr=`<tr><th data-tip="watch"></th>${sh("fund","Fund","l")}${sh("lev","Lev.")}${sh("under","Underlying","l")}${sh("price","Price")}${sh("day","Day")}${showExt?sh("ext","Ext. hours"):sh("m15","15 min")}${sh("vol","Volume")}${sh("dv","$ traded")}${sh("range","Day range","l")}${sh("gap","vs implied")}${sh("sig","Signals","l")}</tr>`;
+  const hdr=`<tr><th data-tip="watch"></th>${sh("fund","Fund","l")}${sh("lev","Lev.")}${sh("under","Underlying","l")}${sh("price","Price")}${sh("day","Day")}${showExt?sh("ext","Ext. hours"):sh("m1","1 min")+sh("m5","5 min")+sh("m15","15 min")}${sh("rev","Reversal")}${sh("vol","Volume")}${sh("dv","$ traded")}${sh("range","Day range","l")}${sh("gap","vs implied")}${sh("sig","Signals","l")}</tr>`;
   $("scanTbl").innerHTML=hdr+(R.slice(0,SC.n).map(r=>`<tr data-f="${r.s}">
     <td><span class="star ${WATCH.includes(r.s)?"on":""}" data-star="${r.s}" title="Watchlist">${WATCH.includes(r.s)?"★":"☆"}</span></td>
     <td class="l">${logoHtml(r.kind==="stock"&&r.u?r.u:r.s)}<b>${r.s}</b><div class="sub nm">${esc(r.n.slice(0,44))}${r.fix?` <span title="Corrected: the Nasdaq feed listed this fund as '${esc(r.fix.n)}'. The name, leverage and underlying here come from a second source." style="color:var(--amber,#f5b041)">✓ fixed</span>`:""}</div></td>
@@ -591,11 +592,12 @@ function renderScanner(){
     <td class="l">${r.u&&r.kind==="stock"?`<b>${esc(r.u)}</b>`:esc(r.lab||"--")} <span class="${cls(r.upct)}">${isFinite(r.upct)?fmtPct(r.upct,1):""}</span></td>
     <td>${fmtPx(r.last)}${r.stale?' <span class="sub" title="Last trade over 30 min ago">·</span>':""}</td>
     <td class="${cls(r.pct)}"><b>${fmtPct(r.pct,1)}</b></td>
-    ${showExt?`<td class="${r.ext?cls(r.ext.pct):""}">${r.ext?fmtPct(r.ext.pct,1):"--"}</td>`:`<td class="${cls(r.m15)}">${isFinite(r.m15)?fmtPct(r.m15,1):"--"}</td>`}
+    ${showExt?`<td class="${r.ext?cls(r.ext.pct):""}">${r.ext?fmtPct(r.ext.pct,1):"--"}</td>`:`<td class="${cls(r.m1)}">${isFinite(r.m1)?fmtPct(r.m1,1):"--"}</td><td class="${cls(r.m5)}">${isFinite(r.m5)?fmtPct(r.m5,1):"--"}</td><td class="${cls(r.m15)}">${isFinite(r.m15)?fmtPct(r.m15,1):"--"}</td>`}
+    <td>${r.rev&&r.rev.score>=0.6?`<b class="${r.rev.dir>0?"up":"down"}" title="${esc(r.rev.src)}: leg ${fmtPct(r.rev.leg,1)}, ${Math.round(r.rev.ret*100)}% given back, ${r.rev.ago} min ago, score ${r.rev.score.toFixed(2)}">${r.rev.score>=1?"HARD ":""}${r.rev.dir>0?"▲ up":"▼ down"}</b>`:'<span class="sub">--</span>'}</td>
     <td>${fmtVol(r.vol)}${isFinite(r.pace)&&r.pace>=1.5?` <span class="sub">${r.pace.toFixed(1)}×</span>`:""}</td><td>${fmtBig(r.dv)}</td>
     <td class="l"><div class="rbar" title="Low ${fmtPx(r.lo)} · high ${fmtPx(r.hi)}"><span style="left:${isFinite(r.pos)?(r.pos*100).toFixed(0):50}%"></span></div></td>
     <td class="${Math.abs(r.gap)>=0.01?cls(r.gap):"sub"}">${isFinite(r.gap)?fmtPct(r.gap,1):"--"}</td>
-    <td class="l">${r.sig.map(([i,t])=>`<span title="${t}">${i}</span>`).join(" ")}</td></tr>`).join("")||`<tr><td colspan="12" class="l sub">${QERR?esc(QERR):UNI.length?"No fund matches these filters.":"Loading the fund list…"}</td></tr>`);
+    <td class="l">${r.sig.map(([i,t])=>`<span title="${t}">${i}</span>`).join(" ")}</td></tr>`).join("")||`<tr><td colspan="15" class="l sub">${QERR?esc(QERR):UNI.length?"No fund matches these filters.":"Loading the fund list…"}</td></tr>`);
   $("scanMore").style.display=R.length>SC.n?"":"none";$("scanMore").textContent=`Show more (${R.length-SC.n} left)`;
   const a=QAT?Math.round((Date.now()-QAT)/1000):null;$("scanAge").innerHTML=a==null?"":`<span class="livedot"></span>${R.length} shown · updated ${a}s ago`;
 }
@@ -1096,6 +1098,7 @@ document.addEventListener("mousemove",e=>{if(cur)place(e)});
 document.addEventListener("scroll",()=>{cur=null;tip.classList.remove("on")},true);
 })();
 </script>
-<script src="layout.js?v=1"></script>
+<script src="rev.js?v=1"></script>
+<script src="layout.js?v=2"></script>
 </body>
 </html>
