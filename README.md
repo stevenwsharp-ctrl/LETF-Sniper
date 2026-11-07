@@ -64,3 +64,7 @@ The site uses the same Cloudflare Worker as SOXX Sniper. Both sites are on `stev
 - Thinly traded funds can show a last trade that is many minutes old. The scanner marks these with a dot and the "$ traded" filter hides them by default.
 - Leveraged ETFs reset each day and lose value in choppy markets. Nothing here is investment advice.
 - Contact: sniperdesk.tribunal635@passmail.net
+
+## What worked this week (`lessons.js`)
+
+A card at the top reads the paper bots' record from SOXX Sniper (`bots.json` on its `bots` branch): each entry idea's result on 2× and 3× funds over the last 7 market days, the scanner tab that matches it, whether the bots use it now, a warning in a half hour where 2×/3× entries clearly lost, and the Cohort Sniper weekly lesson (do not chase; place the limit order on the pull-back).
