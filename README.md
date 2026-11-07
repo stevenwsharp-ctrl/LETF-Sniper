@@ -68,3 +68,18 @@ The site uses the same Cloudflare Worker as SOXX Sniper. Both sites are on `stev
 ## What worked this week (`lessons.js`)
 
 A card at the top reads the paper bots' record from SOXX Sniper (`bots.json` on its `bots` branch): each entry idea's result on 2× and 3× funds over the last 7 market days, the scanner tab that matches it, whether the bots use it now, a warning in a half hour where 2×/3× entries clearly lost, and the Cohort Sniper weekly lesson (do not chase; place the limit order on the pull-back).
+
+## First Breaths (fb.js · shared by LETF Sniper, SOXX Sniper, Cohort Sniper and Mastermind Investor)
+
+A spider-web intelligence factor that finds the first signs of an inflection point. Open a stock, ETF or crypto (fund page, stock page, an open Cohort row, or a Mastermind search) and the First Breaths card shows two lists:
+
+- **Reversal breaths** (the move may turn): RSI divergence, volume climax, rejection wick, VWAP 2.5σ snap back, failed breakout, structure break, engulfing bar, VWAP lost, squeeze or range break against the move.
+- **Continuation breaths** (the move may amplify): range breakout on volume, pullback to EMA 20 held, flag breakout, squeeze release, higher low / lower high, momentum ignition, VWAP reclaimed.
+
+A list with no breath is not shown. Each breath shows the exact bar it flashed on (1m or 5m bar close), when the page pushed it, its price, the ±1 ATR test levels, its learned reliability and how often it repeated.
+
+- Live data: Yahoo 1-minute bars through the Worker every 15 s (stocks and ETFs, with extended hours); Hyperliquid 1-minute candles every 5 s (crypto and Hyperliquid markets). Only closed bars count.
+- Learning: every breath is scored when its time is up (1m: 15 bars, 5m: 6 bars): a hit if price went +1 ATR its way before −1 ATR against it. On the first open, the last 3–5 days are scored at once. Reliability = this market's hit rate, pulled toward the same breath's rate on all markets of the same kind. Breaths that fail (under 46% over 30+) are hidden; ★ proven = 30+ scored and 57%+. The ranking favors strong, reliable and repeated breaths.
+- Push: new breaths are highlighted; reliable, repeated or confirmed ones also pop up. Sound and browser notifications are buttons on the card.
+- The live breaths feed the spider web as `fb.rev` and `fb.cont`, and the scored results go to the knowledge hub.
+- No Worker change is needed (it uses the existing `/chart` route).

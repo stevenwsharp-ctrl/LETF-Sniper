@@ -1055,6 +1055,7 @@ start().then(()=>{if(curF)fvLoad(curF,true)});
 <script src="matrix.js?v=1"></script>
 <script src="planner.js?v=4"></script>
 <script src="letfweb.js?v=4"></script>
+<script src="fb.js?v=1"></script>
 <script>(function(){const el=document.getElementById("widthSel");if(!el)return;let v="fit";try{v=localStorage.getItem("site_width")||"fit"}catch(e){}el.value=v;
 el.onchange=()=>{const x=el.value;try{localStorage.setItem("site_width",x)}catch(e){}document.documentElement.style.setProperty("--pagew",x==="fit"?"100%":x+"px");window.dispatchEvent(new Event("resize"))}})();</script>
 <script src="sell.js?v=2"></script>
