@@ -47,12 +47,20 @@
   const BARS = {}, LIVE = {}, BT = {}; let busy = false, btT = 0;
   async function bars(t, range) { const j = await (await fetch(`${P()}/chart?t=${encodeURIComponent(t)}&range=${range}&interval=1m`)).json().catch(() => null); if (!j || j.status !== "ok") return null; const B = (j.bars || []).filter(b => b[4] != null && b[2] != null && b[3] != null); return B.length ? B : null; }
   const toS = B => ({ c: B.map(b => b[4]), h: B.map(b => b[2]), l: B.map(b => b[3]), v: B.map(b => b[5] || 0), t: B.map(b => b[0]) });
+  // one reading per underlying: every fund with an underlying (single stocks, indexes, commodities, crypto) reads the
+  // underlying's 1-minute bars, so the long and the inverse funds on it can never disagree (before: index funds such as
+  // SOXL and SOXS each read their own bars and could show different turns and scores)
+  const uT = u => /\.X$/.test(u) ? u.replace(/\.X$/, "-USD") : u, keyOf = r => r.u ? uT(r.u) : r.s;
   function targets() { const R = typeof ROWS !== "undefined" ? ROWS : [], W = typeof WATCH !== "undefined" ? WATCH : [], U = new Map();
     const add = (t, k) => { if (t && !U.has(t)) U.set(t, k); };
-    R.filter(r => W.includes(r.s)).forEach(r => add(r.kind === "stock" && r.u ? r.u : r.s));
-    R.filter(r => r.kind === "stock" && r.u && r.dv >= 1e6).sort((a, b) => Math.abs(b.m5 || b.pct || 0) - Math.abs(a.m5 || a.pct || 0)).slice(0, 10).forEach(r => add(r.u));
-    R.filter(r => r.kind !== "stock" && r.dv >= 5e6).sort((a, b) => b.dv - a.dv).slice(0, 6).forEach(r => add(r.s));
+    R.filter(r => W.includes(r.s)).forEach(r => add(keyOf(r)));
+    R.filter(r => r.kind === "stock" && r.u && r.dv >= 1e6).sort((a, b) => Math.abs(b.m5 || b.pct || 0) - Math.abs(a.m5 || a.pct || 0)).slice(0, 10).forEach(r => add(keyOf(r)));
+    R.filter(r => r.kind !== "stock" && r.dv >= 5e6).sort((a, b) => b.dv - a.dv).slice(0, 6).forEach(r => add(keyOf(r)));
     return [...U.keys()].slice(0, 16); }
+  // without 1-minute bars: the underlying's own quotes; if the page has no quotes for the underlying, the most traded fund
+  // on it (its reading is mapped to every other fund through the sign of the leverage)
+  let REF = {}, refAt = 0;
+  function refOf(u) { if (Date.now() - refAt > 2e4) { refAt = Date.now(); REF = {}; (typeof ROWS !== "undefined" ? ROWS : []).forEach(r => { if (r.u && r.L && (!REF[r.u] || r.dv > REF[r.u].dv)) REF[r.u] = { s: r.s, L: r.L, dv: r.dv }; }); } return REF[u] || null; }
   async function pull() { if (busy || !P()) return; const ph = typeof phaseAt === "function" ? phaseAt(Date.now()) : "regular"; busy = true;
     try { const T = targets(); for (let k = 0; k < T.length; k += 4) await Promise.all(T.slice(k, k + 4).map(async t => { const B = await bars(t, "1d"); if (B) { BARS[t] = B; const S = toS(B); LIVE[t] = ph === "closed" ? null : detect(S, S.c.length - 2); } }));
       if (Date.now() - btT > 30 * 6e4) { btT = Date.now(); for (let k = 0; k < T.length; k += 4) await Promise.all(T.slice(k, k + 4).map(async t => { if (BT[t] && Date.now() - BT[t].at < 6 * 36e5) return; const B = await bars(t, "5d"); if (B) BT[t] = { at: Date.now(), r: backtest(B) }; })); report(); }
@@ -70,16 +78,23 @@
   // called by the scanner for each row: 1-min and 5-min moves, and the reversal reading
   const QC = {};   // quote-based readings, kept for 20 s per fund (cheap)
   window.revRow = r => { const a = snapAt(r.s, 1), b = snapAt(r.s, 5); r.m1 = a && a[1] > 0 ? r.last / a[1] - 1 : NaN; r.m5 = b && b[1] > 0 ? r.last / b[1] - 1 : r.m5;
-    const u = r.kind === "stock" && r.u ? r.u : null; let x = null, src = "", own = true;
-    if (u && LIVE[u]) { x = LIVE[u]; src = u; own = false; } else if (LIVE[r.s]) { x = LIVE[r.s]; src = r.s; } else if (r.dv >= 1e5 && !(u && BARS[u])) { const c = QC[r.s]; if (c && Date.now() - c.at < 2e4) x = c.x; else { const M = minutes(r.s); x = M ? detect(M, M.c.length - 1) : null; QC[r.s] = { at: Date.now(), x }; } src = r.s + " (quotes)"; }
-    r.rev = x ? { ...x, dir: x.side * (own ? 1 : Math.sign(r.L)), src } : null;
+    const u = r.u || null, ut = u ? uT(u) : null; let x = null, src = "", k = 1;   // k: sign that maps the reading to this fund
+    const fromQuotes = s => { const c = QC[s]; if (c && Date.now() - c.at < 2e4) return c.x; const M = minutes(s), y = M ? detect(M, M.c.length - 1) : null; QC[s] = { at: Date.now(), x: y }; return y; };
+    if (u) { if (LIVE[ut]) { x = LIVE[ut]; src = u; k = Math.sign(r.L) || 1; }
+      else if (!BARS[ut]) { if (SNAP[u] && SNAP[u].length >= 3) { x = fromQuotes(u); src = u + " (quotes)"; k = Math.sign(r.L) || 1; }
+        else { const f = refOf(u), y = f && f.dv >= 1e5 ? fromQuotes(f.s) : null; if (y) { x = { ...y, side: y.side * (Math.sign(f.L) || 1) }; src = u + " (" + f.s + " quotes)"; k = Math.sign(r.L) || 1; } } } }
+    else if (LIVE[r.s]) { x = LIVE[r.s]; src = r.s; } else if (r.dv >= 1e5 && !BARS[r.s]) { x = fromQuotes(r.s); src = r.s + " (quotes)"; }
+    r.rev = x ? { ...x, dir: x.side * k, src } : null;
     const evf = window.EVR ? EVR.factor("letf", r.rev && r.rev.score >= 1 ? "rev.hard.15m" : "rev.all.15m") : 1; if (r.rev) r.rev.evf = evf;   // EV governor: a muted rule shows no flag
     if (r.rev && r.rev.score >= 0.6 && evf > 0) r.sig.unshift(["⤾", `${r.rev.score >= 1 ? "HARD " : ""}reversal ${r.rev.dir > 0 ? "up" : "down"} (${src}: leg ${pc(r.rev.leg, 1)}, ${Math.round(r.rev.ret * 100)}% given back, ${r.rev.ago} min ago)`]); };
   function readings() { return (typeof ROWS !== "undefined" ? ROWS : []).filter(r => r.rev); }
   // the EV governor's ruling (ev.json, after each US close; 7 days of 1-minute bars on 30 markets)
   const evTxt = (id, lab) => { const x = window.EVR && EVR.item("letf", id); if (!x) return ""; const fast = /^fast/.test(id), col = x.status === "mute" ? "down" : x.status === "back" ? "up" : x.status === "cut" ? "" : "";
-    const what = fast ? (x.ev > 0 ? "follow fast moves" : "fade fast moves") : x.status === "mute" ? "muted: no flags in the scanner" : x.status === "back" ? "backed" : x.status === "cut" ? "half weight" : "watch";
-    return `<div class="sub" style="font-size:11.5px;margin-top:4px">EV governor${lab ? " · " + lab : ""}: <b class="${col}">${x.status.toUpperCase()}</b> (${what}) · ${x.n} cases, next 15 min mean ${pc(x.ev, 3)}, z ${isFinite(x.z) ? x.z.toFixed(1) : "–"}, ${isFinite(x.hit) ? Math.round(x.hit * 100) + "% right" : ""}</div>`; };
+    const what = fast ? (x.older * x.recent < 0 ? "no clear edge: the two halves of the test disagree" : x.ev > 0 ? "follow fast moves" : "fade fast moves") : x.status === "mute" ? "muted: no flags in the scanner" : x.status === "back" ? "backed" : x.status === "cut" ? "half weight" : "watch";
+    // the opposite reading counts only when it holds on the older half AND on the newer half of the test (walk-forward)
+    const both = x.ev < 0 && x.older < 0 && x.recent < 0 && (x.status === "mute" || x.status === "cut");
+    const fade = both ? ` · <b style="color:var(--amber,#ffb547)">Opposite reading:</b> ${fast ? "after a fast move, price tended to come back" : "a turn tended to fail and the old direction came back"} (${isFinite(x.hit) ? Math.round((1 - x.hit) * 100) + "% of cases, " : ""}older half ${pc(-x.older, 2)}, newer half ${pc(-x.recent, 2)} per 15 min). Do not chase it. Not yet tested with limit entries.` : "";
+    return `<div class="sub" style="font-size:11.5px;margin-top:4px">EV governor${lab ? " · " + lab : ""}: <b class="${col}">${x.status.toUpperCase()}</b> (${what}) · ${x.n} cases, next 15 min mean ${pc(x.ev, 3)}, z ${isFinite(x.z) ? x.z.toFixed(1) : "–"}, ${isFinite(x.hit) ? Math.round(x.hit * 100) + "% right" : ""}${fade}</div>`; };
   function draw() {
     const R = typeof ROWS !== "undefined" ? ROWS : [], rd = readings();
     // one line per market (underlying or fund), with its funds
