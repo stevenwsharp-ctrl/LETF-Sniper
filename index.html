@@ -593,7 +593,7 @@ function renderScanner(){
     <td>${fmtPx(r.last)}${r.stale?' <span class="sub" title="Last trade over 30 min ago">·</span>':""}</td>
     <td class="${cls(r.pct)}"><b>${fmtPct(r.pct,1)}</b></td>
     ${showExt?`<td class="${r.ext?cls(r.ext.pct):""}">${r.ext?fmtPct(r.ext.pct,1):"--"}</td>`:`<td class="${cls(r.m1)}">${isFinite(r.m1)?fmtPct(r.m1,1):"--"}</td><td class="${cls(r.m5)}">${isFinite(r.m5)?fmtPct(r.m5,1):"--"}</td><td class="${cls(r.m15)}">${isFinite(r.m15)?fmtPct(r.m15,1):"--"}</td>`}
-    <td>${r.rev&&r.rev.score>=0.6?`<b class="${r.rev.dir>0?"up":"down"}" title="${esc(r.rev.src)}: leg ${fmtPct(r.rev.leg,1)}, ${Math.round(r.rev.ret*100)}% given back, ${r.rev.ago} min ago, score ${r.rev.score.toFixed(2)}">${r.rev.score>=1?"HARD ":""}${r.rev.dir>0?"▲ up":"▼ down"}</b>`:'<span class="sub">--</span>'}</td>
+    <td>${r.rev&&r.rev.score>=0.6?`<b class="${r.rev.evf===0?"sub":r.rev.dir>0?"up":"down"}" title="${r.rev.evf===0?"Muted by the EV governor (proven negative EV: after a turn the old direction tended to come back). ":""}${esc(r.rev.src)}: leg ${fmtPct(r.rev.leg,1)}, ${Math.round(r.rev.ret*100)}% given back, ${r.rev.ago} min ago, score ${r.rev.score.toFixed(2)}">${r.rev.score>=1?"HARD ":""}${r.rev.dir>0?"▲ up":"▼ down"}</b>`:'<span class="sub">--</span>'}</td>
     <td>${fmtVol(r.vol)}${isFinite(r.pace)&&r.pace>=1.5?` <span class="sub">${r.pace.toFixed(1)}×</span>`:""}</td><td>${fmtBig(r.dv)}</td>
     <td class="l"><div class="rbar" title="Low ${fmtPx(r.lo)} · high ${fmtPx(r.hi)}"><span style="left:${isFinite(r.pos)?(r.pos*100).toFixed(0):50}%"></span></div></td>
     <td class="${Math.abs(r.gap)>=0.01?cls(r.gap):"sub"}">${isFinite(r.gap)?fmtPct(r.gap,1):"--"}</td>
@@ -1100,7 +1100,7 @@ document.addEventListener("scroll",()=>{cur=null;tip.classList.remove("on")},tru
 })();
 </script>
 <script src="evrules.js?v=1"></script>
-<script src="rev.js?v=3"></script>
+<script src="rev.js?v=4"></script>
 <script src="lessons.js?v=1"></script>
 <script src="layout.js?v=3"></script>
 </body>
