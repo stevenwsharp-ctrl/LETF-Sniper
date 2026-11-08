@@ -73,8 +73,13 @@
     const u = r.kind === "stock" && r.u ? r.u : null; let x = null, src = "", own = true;
     if (u && LIVE[u]) { x = LIVE[u]; src = u; own = false; } else if (LIVE[r.s]) { x = LIVE[r.s]; src = r.s; } else if (r.dv >= 1e5 && !(u && BARS[u])) { const c = QC[r.s]; if (c && Date.now() - c.at < 2e4) x = c.x; else { const M = minutes(r.s); x = M ? detect(M, M.c.length - 1) : null; QC[r.s] = { at: Date.now(), x }; } src = r.s + " (quotes)"; }
     r.rev = x ? { ...x, dir: x.side * (own ? 1 : Math.sign(r.L)), src } : null;
-    if (r.rev && r.rev.score >= 0.6) r.sig.unshift(["⤾", `${r.rev.score >= 1 ? "HARD " : ""}reversal ${r.rev.dir > 0 ? "up" : "down"} (${src}: leg ${pc(r.rev.leg, 1)}, ${Math.round(r.rev.ret * 100)}% given back, ${r.rev.ago} min ago)`]); };
+    const evf = window.EVR ? EVR.factor("letf", r.rev && r.rev.score >= 1 ? "rev.hard.15m" : "rev.all.15m") : 1; if (r.rev) r.rev.evf = evf;   // EV governor: a muted rule shows no flag
+    if (r.rev && r.rev.score >= 0.6 && evf > 0) r.sig.unshift(["⤾", `${r.rev.score >= 1 ? "HARD " : ""}reversal ${r.rev.dir > 0 ? "up" : "down"} (${src}: leg ${pc(r.rev.leg, 1)}, ${Math.round(r.rev.ret * 100)}% given back, ${r.rev.ago} min ago)`]); };
   function readings() { return (typeof ROWS !== "undefined" ? ROWS : []).filter(r => r.rev); }
+  // the EV governor's ruling (ev.json, after each US close; 7 days of 1-minute bars on 30 markets)
+  const evTxt = (id, lab) => { const x = window.EVR && EVR.item("letf", id); if (!x) return ""; const fast = /^fast/.test(id), col = x.status === "mute" ? "down" : x.status === "back" ? "up" : x.status === "cut" ? "" : "";
+    const what = fast ? (x.ev > 0 ? "follow fast moves" : "fade fast moves") : x.status === "mute" ? "muted: no flags in the scanner" : x.status === "back" ? "backed" : x.status === "cut" ? "half weight" : "watch";
+    return `<div class="sub" style="font-size:11.5px;margin-top:4px">EV governor${lab ? " · " + lab : ""}: <b class="${col}">${x.status.toUpperCase()}</b> (${what}) · ${x.n} cases, next 15 min mean ${pc(x.ev, 3)}, z ${isFinite(x.z) ? x.z.toFixed(1) : "–"}, ${isFinite(x.hit) ? Math.round(x.hit * 100) + "% right" : ""}</div>`; };
   function draw() {
     const R = typeof ROWS !== "undefined" ? ROWS : [], rd = readings();
     // one line per market (underlying or fund), with its funds
@@ -88,7 +93,8 @@
       <div class="r3"><div><div class="tw" style="overflow-x:auto"><table><tr><th class="l">Market</th><th class="l">Turn</th><th>Leg</th><th>Given back</th><th>Since</th><th>Score</th><th class="l">Funds</th></tr>
         ${L.map(g => `<tr class="${g.x.score >= 1 ? "hard" : ""}" data-f="${g.funds[0].s}"><td class="l"><b>${E(g.k)}</b></td><td class="l"><span class="tg" style="background:${g.x.side > 0 ? "var(--up,#19d38a)" : "var(--down,#ff4d5e)"}">${g.x.score >= 1 ? "HARD " : ""}${g.x.side > 0 ? "BOTTOM ▲" : "TOP ▼"}</span></td><td>${pc(g.x.side > 0 ? -g.x.leg : g.x.leg, 1)} <span class="sub">${g.x.legMin} min</span></td><td>${Math.round(g.x.ret * 100)}%</td><td>${g.x.ago} min</td><td><b>${g.x.score.toFixed(2)}</b></td><td class="l">${fundsTxt(g)}</td></tr>`).join("") || `<tr><td class="l sub" colspan="7">${P() ? "No reversal now. A reversal = a big leg in the last 30 minutes, then half or more given back within 8 minutes." : "Add the Worker URL in Settings for 1-minute bars (the page's own quotes still work after 15 minutes)."}</td></tr>`}</table></div>
         <div class="sub" style="font-size:11.5px;margin-top:4px;line-height:1.45">${S ? `Test on the last 5 days of 1-minute bars (${Object.keys(BT).length} markets). ${bt(S, "All turns")}. ${bt(H, "HARD only")}. 50% = a coin flip.` : "The test on the last 5 days of 1-minute bars runs after the first minute."} A bottom is ▲ for long funds and ▼ for inverse funds on the same underlying. A reversal is a warning and a chance, not an order: wait for the next 1-minute bar to hold, and use a limit entry.</div></div>
-        <div>${mt(m1, "m1", "Fastest 1 min")}</div><div>${mt(m5, "m5", "Fastest 5 min")}</div></div></details>`;
+        <div>${mt(m1, "m1", "Fastest 1 min")}${evTxt("fast.1m.15m")}</div><div>${mt(m5, "m5", "Fastest 5 min")}${evTxt("fast.5m.15m")}</div></div>
+      ${evTxt("rev.all.15m", "Reversal rule")}${evTxt("rev.hard.15m", "HARD reversals")}</details>`;
   }
   setTimeout(pull, 3000); setInterval(pull, 60000); setInterval(draw, 12000);
 })();
