@@ -85,15 +85,22 @@
         else { const f = refOf(u), y = f && f.dv >= 1e5 ? fromQuotes(f.s) : null; if (y) { x = { ...y, side: y.side * (Math.sign(f.L) || 1) }; src = u + " (" + f.s + " quotes)"; k = Math.sign(r.L) || 1; } } } }
     else if (LIVE[r.s]) { x = LIVE[r.s]; src = r.s; } else if (r.dv >= 1e5 && !BARS[r.s]) { x = fromQuotes(r.s); src = r.s + " (quotes)"; }
     r.rev = x ? { ...x, dir: x.side * k, src } : null;
-    const evf = window.EVR ? EVR.factor("letf", r.rev && r.rev.score >= 1 ? "rev.hard.15m" : "rev.all.15m") : 1; if (r.rev) r.rev.evf = evf;   // EV governor: a muted rule shows no flag
+    // EV governor: a muted rule shows no flag. HARD turns are a subset of all turns, so they take the lower factor of the
+    // two rulings (before: a HARD turn read only rev.hard.15m, and its "cut" brought the follow flag back while all turns were muted)
+    const evf = window.EVR ? (r.rev && r.rev.score >= 1 ? Math.min(EVR.factor("letf", "rev.all.15m"), EVR.factor("letf", "rev.hard.15m")) : EVR.factor("letf", "rev.all.15m")) : 1; if (r.rev) r.rev.evf = evf;
     if (r.rev && r.rev.score >= 0.6 && evf > 0) r.sig.unshift(["⤾", `${r.rev.score >= 1 ? "HARD " : ""}reversal ${r.rev.dir > 0 ? "up" : "down"} (${src}: leg ${pc(r.rev.leg, 1)}, ${Math.round(r.rev.ret * 100)}% given back, ${r.rev.ago} min ago)`]); };
   function readings() { return (typeof ROWS !== "undefined" ? ROWS : []).filter(r => r.rev); }
   // the EV governor's ruling (ev.json, after each US close; 7 days of 1-minute bars on 30 markets)
+  // the limit-entry test of the opposite reading (fade.*), as the scorecard reports it. The fade was found on the same
+  // 7 days as the mute, so the page shows no fade flag until it stays backed on new market days (council, Nov 8).
+  const limTxt = id => { const f = id && window.EVR && EVR.item("letf", id); if (!f) return "Not yet tested with limit entries.";
+    const ok = f.status === "back" && f.older > 0 && f.recent > 0;
+    return `Limit-entry test (${E(f.desc.split(":")[0])}): <b class="${ok ? "up" : ""}">${f.status.toUpperCase()}</b>, ${f.n} fills${isFinite(f.fill) ? " (" + Math.round(f.fill * 100) + "% of limits touched)" : ""}, ${pc(f.ev, 2)} per trade after cost, older half ${pc(f.older, 2)}, newer half ${pc(f.recent, 2)}. ${ok ? "Not yet proven on new market days: no flag, no order yet." : "No proven edge yet."}`; };
   const evTxt = (id, lab) => { const x = window.EVR && EVR.item("letf", id); if (!x) return ""; const fast = /^fast/.test(id), col = x.status === "mute" ? "down" : x.status === "back" ? "up" : x.status === "cut" ? "" : "";
-    const what = fast ? (x.older * x.recent < 0 ? "no clear edge: the two halves of the test disagree" : x.ev > 0 ? "follow fast moves" : "fade fast moves") : x.status === "mute" ? "muted: no flags in the scanner" : x.status === "back" ? "backed" : x.status === "cut" ? "half weight" : "watch";
+    const what = fast ? (x.older * x.recent < 0 ? "no clear edge: the two halves of the test disagree" : x.ev > 0 ? "follow fast moves" : "fade fast moves") : x.status === "mute" ? "muted: no flags in the scanner" : x.status === "back" ? "backed" : x.status === "cut" ? (id === "rev.hard.15m" && EVR.factor("letf", "rev.all.15m") === 0 ? "muted with all turns: HARD turns are part of them" : "half weight") : "watch";
     // the opposite reading counts only when it holds on the older half AND on the newer half of the test (walk-forward)
     const both = x.ev < 0 && x.older < 0 && x.recent < 0 && (x.status === "mute" || x.status === "cut");
-    const fade = both ? ` · <b style="color:var(--amber,#ffb547)">Opposite reading:</b> ${fast ? "after a fast move, price tended to come back" : "a turn tended to fail and the old direction came back"} (${isFinite(x.hit) ? Math.round((1 - x.hit) * 100) + "% of cases, " : ""}older half ${pc(-x.older, 2)}, newer half ${pc(-x.recent, 2)} per 15 min). Do not chase it. Not yet tested with limit entries.` : "";
+    const fade = both ? ` · <b style="color:var(--amber,#ffb547)">Opposite reading:</b> ${fast ? "after a fast move, price tended to come back" : "a turn tended to fail and the old direction came back"} (${isFinite(x.hit) ? Math.round((1 - x.hit) * 100) + "% of cases, " : ""}older half ${pc(-x.older, 2)}, newer half ${pc(-x.recent, 2)} per 15 min). Do not chase it. ${id === "rev.hard.15m" ? "" : limTxt({ "fast.5m.15m": "fade.fast5m.15m", "rev.all.15m": "fade.rev.15m" }[id])}` : "";
     return `<div class="sub" style="font-size:11.5px;margin-top:4px">EV governor${lab ? " · " + lab : ""}: <b class="${col}">${x.status.toUpperCase()}</b> (${what}) · ${x.n} cases, next 15 min mean ${pc(x.ev, 3)}, z ${isFinite(x.z) ? x.z.toFixed(1) : "–"}, ${isFinite(x.hit) ? Math.round(x.hit * 100) + "% right" : ""}${fade}</div>`; };
   // the card: open or closed as the reader left it (before: every redraw opened it again, every 12 s)
   let OPEN = null, LASTOP = null; card.addEventListener("toggle", e => { if (e.target.tagName === "DETAILS" && e.target.open !== LASTOP) OPEN = LASTOP = e.target.open; }, true);

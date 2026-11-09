@@ -541,7 +541,7 @@ function rowOf(f){
   r.gap=isFinite(r.imp)&&isFinite(pct)?pct-r.imp:NaN;
   r.sig=[];const big=f.kind==="stock"?0.1:0.05;
   if(Math.abs(pct)>=big*2)r.sig.push(["🔥","moved "+fmtPct(pct,1)]);else if(Math.abs(pct)>=big)r.sig.push(["⚡","big move"]);
-  if(Math.abs(m15)>=(f.kind==="stock"?0.04:0.02))r.sig.push(["🚀","fast move: "+fmtPct(m15,1)+" in 15 min"]);
+  if(Math.abs(m15)>=(f.kind==="stock"?0.04:0.02))r.sig.push(["🚀","fast move: "+fmtPct(m15,1)+" in 15 min"+fastEdge()]);
   if(pace>=3&&dv>2e5)r.sig.push(["📈","volume surge "+pace.toFixed(1)+"×"]);
   if(r.pos>=0.98&&pct>0.03)r.sig.push(["⬆","at day high"]);else if(r.pos<=0.02&&pct<-0.03)r.sig.push(["⬇","at day low"]);
   if(ext&&Math.abs(ext.pct)>=0.05)r.sig.push(["🌙","extended hours "+fmtPct(ext.pct,1)]);
@@ -657,6 +657,12 @@ function renderStrip(){
 
 /* ---------- alerts and posts ---------- */
 var ALERTS=[],alSeen={},alertsOn=lsGet("letf_alerts")==="on";
+// EV governor ruling on the 🚀 rule (fast.15m.15m: follow a 4%/2% 15-minute move for the next 15 min). Until the test
+// backs it on both halves, every 🚀 flag, alert and post says that it has no proven edge.
+function fastEdge(){const x=window.EVR&&EVR.item("letf","fast.15m.15m");if(!x)return " · no proven edge, do not chase";
+  if(x.status==="back"&&x.older>0&&x.recent>0)return "";
+  if(x.status==="mute"||(x.ev<0&&x.older<0&&x.recent<0&&x.status==="cut"))return " · fast moves tended to come back: do not chase";
+  return " · no proven edge, do not chase"}
 function alert1(key,cool,text,s,hot){const now=Date.now();if(alSeen[key]&&now-alSeen[key]<cool)return;alSeen[key]=now;ALERTS.unshift({t:now,text,s,hot});if(ALERTS.length>50)ALERTS.pop();
   if(alertsOn&&"Notification"in window&&Notification.permission==="granted")try{new Notification("LETF Sniper",{body:text,tag:key})}catch(e){}renderAlerts()}
 function renderAlerts(){$("alertList").innerHTML=ALERTS.length?ALERTS.slice(0,14).map((a,i)=>`<div class="al ${a.hot?"hot":""}"><span class="tm">${new Date(a.t).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})}</span><span>${esc(a.text)}</span><span class="b"><button data-al="x" data-i="${i}">Post</button><button data-al="c" data-i="${i}">Copy</button></span></div>`).join(""):'<div class="sub">No alerts yet. The page watches every fund for big moves, fast 15-minute moves, volume surges, new day highs and extended-hours spikes, plus the alerts you set on each fund.</div>'}
@@ -665,7 +671,7 @@ function checkAlerts(){
   ROWS.forEach(r=>{if(r.dv<5e5&&!WATCH.includes(r.s))return;const st=r.kind==="stock",th=st?[0.1,0.2,0.3,0.5]:[0.05,0.1,0.15];
     const hit=th.filter(x=>Math.abs(r.pct)>=x);if(hit.length&&ph!=="closed"){const top=hit[hit.length-1];hit.slice(0,-1).forEach(x=>{alSeen[`b:${r.s}:${day}:${Math.sign(r.pct)}${x}`]=alSeen[`b:${r.s}:${day}:${Math.sign(r.pct)}${x}`]||Date.now()});
       alert1(`b:${r.s}:${day}:${Math.sign(r.pct)}${top}`,864e5,`${r.pct>0?"🔥":"🧊"} $${r.s} (${levTxt(r.L)} ${r.kind==="stock"?"$"+r.u:r.lab}) ${fmtPct(r.pct,1)} today at ${fmtPx(r.last)} · ${fmtBig(r.dv)} traded`,r.s,top>=th[1])}
-    if(isFinite(r.m15)&&Math.abs(r.m15)>=(st?0.05:0.025)&&r.dv>=1e6)alert1(`m:${r.s}:${Math.sign(r.m15)}`,30*60000,`🚀 $${r.s} ${fmtPct(r.m15,1)} in 15 minutes → ${fmtPx(r.last)} (${fmtPct(r.pct,1)} today)`,r.s,true);
+    if(isFinite(r.m15)&&Math.abs(r.m15)>=(st?0.05:0.025)&&r.dv>=1e6)alert1(`m:${r.s}:${Math.sign(r.m15)}`,30*60000,`🚀 $${r.s} ${fmtPct(r.m15,1)} in 15 minutes → ${fmtPx(r.last)} (${fmtPct(r.pct,1)} today)${fastEdge()}`,r.s,true);
     if(r.pace>=4&&r.dv>=1e6)alert1(`v:${r.s}`,45*60000,`📈 $${r.s} volume surge: last 15 min ${r.pace.toFixed(1)}× its pace today · ${fmtPct(r.pct,1)}`,r.s);
     if(r.ext&&Math.abs(r.ext.pct)>=(st?0.08:0.04))alert1(`x:${r.s}:${day}:${Math.sign(r.ext.pct)}`,864e5,`🌙 $${r.s} ${fmtPct(r.ext.pct,1)} in extended hours → ${fmtPx(r.ext.p)}`,r.s,true);
     const w=FW[r.s];if(w){if(w.above&&r.last>=w.above)alert1(`wa:${r.s}:${w.above}:${day}`,864e5,`🎯 $${r.s} crossed above ${fmtPx(w.above)} → ${fmtPx(r.last)}`,r.s,true);
@@ -684,7 +690,7 @@ function posts(){
   const g=[...R].sort((a,b)=>b.pct-a.pct).slice(0,5),l=[...R].sort((a,b)=>a.pct-b.pct).slice(0,3);
   P.push({title:"Top leveraged ETF movers",text:["Leveraged ETF movers today:",...g.map(r=>`▲ $${r.s} ${fmtPct(r.pct,1)} (${levTxt(r.L)} ${r.kind==="stock"?"$"+r.u:r.lab})`),...l.map(r=>`▼ $${r.s} ${fmtPct(r.pct,1)} (${levTxt(r.L)} ${r.kind==="stock"?"$"+r.u:r.lab})`),"#LeveragedETF"].join("\n")});
   const m=R.filter(r=>isFinite(r.m15)).sort((a,b)=>Math.abs(b.m15)-Math.abs(a.m15)).slice(0,4);
-  if(m.length)P.push({title:"Moving fast now (15 min)",text:["Fastest leveraged ETFs, last 15 min:",...m.map(r=>`${r.m15>0?"🚀":"🧊"} $${r.s} ${fmtPct(r.m15,1)} → ${fmtPx(r.last)} (${fmtPct(r.pct,1)} today)`),"#daytrading"].join("\n")});
+  if(m.length)P.push({title:"Moving fast now (15 min)",text:["Fastest leveraged ETFs, last 15 min:",...m.map(r=>`${r.m15>0?"🚀":"🧊"} $${r.s} ${fmtPct(r.m15,1)} → ${fmtPx(r.last)} (${fmtPct(r.pct,1)} today)`),(e=>e?e.replace(/^ · /,"").replace(/^./,c=>c.toUpperCase())+".":"")(fastEdge()),"#daytrading"].filter(Boolean).join("\n")});
   const G={};R.forEach(r=>{if(r.kind!=="stock"||!r.u)return;(G[r.u]||(G[r.u]=[])).push(r)});const best=Object.entries(G).sort((a,b)=>Math.abs(b[1][0].upct||0)-Math.abs(a[1][0].upct||0))[0];
   if(best){const [u,F]=best,lo=F.filter(f=>f.L>0).sort((a,b)=>b.dv-a.dv)[0],sh=F.filter(f=>f.L<0).sort((a,b)=>b.dv-a.dv)[0];
     P.push({title:"Story of the day",text:[`$${u} ${fmtPct(F[0].upct,1)} today.`,lo?`2× long $${lo.s}: ${fmtPct(lo.pct,1)} (${fmtBig(lo.dv)} traded)`:"",sh?`Inverse $${sh.s}: ${fmtPct(sh.pct,1)}`:"",`${F.length} leveraged funds track $${u}.`].filter(Boolean).join("\n")})}
@@ -1078,7 +1084,7 @@ const T={
  "Day range":"<b>Day range</b> — where the price sits inside today's low–high range. The marker on the left = at the day's low; on the right = at the day's high.",
  "vs implied":"<b>vs implied</b> — the fund's move today <b>minus</b> the move its leverage implies (leverage × the underlying's move).<br>Example: the stock is up 5% and the fund is 2× → implied +10%. If the fund is up 10.3%, this shows <b>+0.3%</b>.<br><b>+</b> = the fund is ahead of its underlying (rich) · <b>−</b> = behind (cheap). Gaps under 1% are normal and shown in grey. Larger gaps come from a premium or discount to the fund's value, prices taken at slightly different moments, or heavy buying or selling of the fund itself. A big gap often closes.",
  "implied":"<b>Implied fund move</b> — what the fund 'should' have done today: leverage × the underlying's move.",
- "Signals":"<b>Signals</b> — what stands out for this fund now (hover an icon for its number):<br>🔥 very big move today (20%+ for single-stock funds, 10%+ for index funds)<br>⚡ big move (10%+ / 5%+)<br>🚀 fast move: 4%+ / 2%+ in the last 15 minutes<br>📈 volume surge: trading 3× faster than the day's average<br>⬆ at the day's high (and up 3%+) · ⬇ at the day's low (and down 3%+)<br>🌙 big extended-hours move (5%+)",
+ "Signals":"<b>Signals</b> — what stands out for this fund now (hover an icon for its number):<br>🔥 very big move today (20%+ for single-stock funds, 10%+ for index funds)<br>⚡ big move (10%+ / 5%+)<br>🚀 fast move: 4%+ / 2%+ in the last 15 minutes (EV test: no proven edge for following it, do not chase)<br>📈 volume surge: trading 3× faster than the day's average<br>⬆ at the day's high (and up 3%+) · ⬇ at the day's low (and down 3%+)<br>🌙 big extended-hours move (5%+)",
  "Move":"<b>Move</b> — the underlying's change today.",
  "Best long fund":"<b>Best long fund</b> — the most traded fund that goes <b>up</b> with this underlying, and its move today.",
  "Best inverse fund":"<b>Best inverse fund</b> — the most traded fund that goes <b>down</b> when this underlying goes up, and its move today.",
@@ -1100,7 +1106,7 @@ document.addEventListener("scroll",()=>{cur=null;tip.classList.remove("on")},tru
 })();
 </script>
 <script src="evrules.js?v=1"></script>
-<script src="rev.js?v=4"></script>
+<script src="rev.js?v=5"></script>
 <script src="lessons.js?v=1"></script>
 <script src="layout.js?v=3"></script>
 </body>
