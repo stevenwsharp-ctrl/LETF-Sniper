@@ -663,15 +663,21 @@ function fastEdge(){const x=window.EVR&&EVR.item("letf","fast.15m.15m");if(!x)re
   if(x.status==="back"&&x.older>0&&x.recent>0)return "";
   if(x.status==="mute"||(x.ev<0&&x.older<0&&x.recent<0&&x.status==="cut"))return " · fast moves tended to come back: do not chase";
   return " · no proven edge, do not chase"}
-function alert1(key,cool,text,s,hot){const now=Date.now();if(alSeen[key]&&now-alSeen[key]<cool)return;alSeen[key]=now;ALERTS.unshift({t:now,text,s,hot});if(ALERTS.length>50)ALERTS.pop();
-  if(alertsOn&&"Notification"in window&&Notification.permission==="granted")try{new Notification("LETF Sniper",{body:text,tag:key})}catch(e){}renderAlerts()}
+// 🚀 push alert (5%/2.5% in 15 min, $1M+ traded): the scorecard tests this exact level (fast.15m.alert). The phone/desktop
+// notification stops while that test loses on the newer half, or while its walk-forward time gate (windows chosen on the
+// older half, scored on the newer half) is muted (council, Nov 10). The alert stays in the list, marked "not pushed".
+// It comes back by itself when the newer half is above 0 and the gate is not muted.
+function fastPushOn(){if(!window.EVR||!EVR.ready)return true;const a=EVR.item("letf","fast.15m.alert"),g=EVR.item("letf","fast.15m.alert.tgate");
+  return !(g&&g.factor===0)&&!(a&&a.recent<0)}
+function alert1(key,cool,text,s,hot,quiet){const now=Date.now();if(alSeen[key]&&now-alSeen[key]<cool)return;alSeen[key]=now;ALERTS.unshift({t:now,text,s,hot});if(ALERTS.length>50)ALERTS.pop();
+  if(!quiet&&alertsOn&&"Notification"in window&&Notification.permission==="granted")try{new Notification("LETF Sniper",{body:text,tag:key})}catch(e){}renderAlerts()}
 function renderAlerts(){$("alertList").innerHTML=ALERTS.length?ALERTS.slice(0,14).map((a,i)=>`<div class="al ${a.hot?"hot":""}"><span class="tm">${new Date(a.t).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})}</span><span>${esc(a.text)}</span><span class="b"><button data-al="x" data-i="${i}">Post</button><button data-al="c" data-i="${i}">Copy</button></span></div>`).join(""):'<div class="sub">No alerts yet. The page watches every fund for big moves, fast 15-minute moves, volume surges, new day highs and extended-hours spikes, plus the alerts you set on each fund.</div>'}
 function checkAlerts(){
   const day=etDate(),ph=phaseAt(Date.now());
   ROWS.forEach(r=>{if(r.dv<5e5&&!WATCH.includes(r.s))return;const st=r.kind==="stock",th=st?[0.1,0.2,0.3,0.5]:[0.05,0.1,0.15];
     const hit=th.filter(x=>Math.abs(r.pct)>=x);if(hit.length&&ph!=="closed"){const top=hit[hit.length-1];hit.slice(0,-1).forEach(x=>{alSeen[`b:${r.s}:${day}:${Math.sign(r.pct)}${x}`]=alSeen[`b:${r.s}:${day}:${Math.sign(r.pct)}${x}`]||Date.now()});
       alert1(`b:${r.s}:${day}:${Math.sign(r.pct)}${top}`,864e5,`${r.pct>0?"🔥":"🧊"} $${r.s} (${levTxt(r.L)} ${r.kind==="stock"?"$"+r.u:r.lab}) ${fmtPct(r.pct,1)} today at ${fmtPx(r.last)} · ${fmtBig(r.dv)} traded`,r.s,top>=th[1])}
-    if(isFinite(r.m15)&&Math.abs(r.m15)>=(st?0.05:0.025)&&r.dv>=1e6)alert1(`m:${r.s}:${Math.sign(r.m15)}`,30*60000,`🚀 $${r.s} ${fmtPct(r.m15,1)} in 15 minutes → ${fmtPx(r.last)} (${fmtPct(r.pct,1)} today)${fastEdge()}`,r.s,true);
+    if(isFinite(r.m15)&&Math.abs(r.m15)>=(st?0.05:0.025)&&r.dv>=1e6)alert1(`m:${r.s}:${Math.sign(r.m15)}`,30*60000,(q=>`🚀 $${r.s} ${fmtPct(r.m15,1)} in 15 minutes → ${fmtPx(r.last)} (${fmtPct(r.pct,1)} today)${fastEdge()}${q?" · not pushed: this alert lost on the newer days of the test":""}`)(!fastPushOn()),r.s,fastPushOn(),!fastPushOn());
     if(r.pace>=4&&r.dv>=1e6)alert1(`v:${r.s}`,45*60000,`📈 $${r.s} volume surge: last 15 min ${r.pace.toFixed(1)}× its pace today · ${fmtPct(r.pct,1)}`,r.s);
     if(r.ext&&Math.abs(r.ext.pct)>=(st?0.08:0.04))alert1(`x:${r.s}:${day}:${Math.sign(r.ext.pct)}`,864e5,`🌙 $${r.s} ${fmtPct(r.ext.pct,1)} in extended hours → ${fmtPx(r.ext.p)}`,r.s,true);
     const w=FW[r.s];if(w){if(w.above&&r.last>=w.above)alert1(`wa:${r.s}:${w.above}:${day}`,864e5,`🎯 $${r.s} crossed above ${fmtPx(w.above)} → ${fmtPx(r.last)}`,r.s,true);
@@ -1106,7 +1112,7 @@ document.addEventListener("scroll",()=>{cur=null;tip.classList.remove("on")},tru
 })();
 </script>
 <script src="evrules.js?v=1"></script>
-<script src="rev.js?v=6"></script>
+<script src="rev.js?v=7"></script>
 <script src="lessons.js?v=1"></script>
 <script src="layout.js?v=3"></script>
 </body>
