@@ -804,9 +804,14 @@ function trendOf(B){if(B.length<22)return{d:0,t:"not enough bars"};const c=B.map
    answers for the same bet, because thin funds have sparse, noisy bars and their own small volume profiles. */
 const UV={};const uTick=u=>/\.X$/.test(u)?u.replace(/\.X$/,"-USD"):u;
 async function uvLoad(u){if(!u)return;const d=UV[u]||(UV[u]={at:0});if(Date.now()-d.at<55000)return;d.at=Date.now();const t=uTick(u);
-  const [b,c]=await Promise.all([getChart(t,"5d","5m"),d.bd&&Date.now()-(d.bdAt||0)<3600000?{bars:d.bd}:getChart(t,"1y","1d")]);if(b.bars)d.b5=b.bars;if(c.bars&&c.bars!==d.bd){d.bd=c.bars;d.bdAt=Date.now()}}
+  const [b,c]=await Promise.all([getChart(t,"5d","5m"),d.bd&&Date.now()-(d.bdAt||0)<3600000?{bars:d.bd}:getChart(t,"1y","1d")]);if(b.bars)d.b5=b.bars;if(c.bars&&c.bars!==d.bd){d.bd=c.bars;d.bdAt=Date.now()}
+  if(!d.b5)d.at=Date.now()-45000}   /* no underlying bars: try again in 10 s, not 55 s (the setup shows WAIT until they load) */
 function setupOf(s){
   const f=UMAP[s]||{},d0=FV[s],F=setupCore(d0,d0&&d0.b5&&d0.b5.length?(livePx(s)||d0.b5[d0.b5.length-1][4]):null,s),ud=f.u&&UV[f.u];
+  /* the fund has an underlying, but its chart is not loaded (Worker error, slow load): the fund's own chart can give the
+     long fund and the inverse fund opposite bets on one asset (a ?demo check: SPXL and SPXS both "LONG SETUP"). Show WAIT
+     on every fund of that underlying until its chart loads; the fund's own levels stay on the chart. */
+  if(F&&f.u&&f.L&&(!ud||!ud.b5))return{...F,side:0,verdict:`WAIT · the $${f.u} chart is not loaded yet`,vc:"dim",plan:null,src:null,noU:f.u};
   if(!ud||!ud.b5||!f.L||!F)return F;const uq=QT[f.u],lu=uq&&uq[0]>0?uq[0]:ud.b5[ud.b5.length-1][4],U=setupCore(ud,lu,null);if(!U)return F;
   const k=Math.sign(f.L),map=p=>p==null||!isFinite(p)?null:F.last*(1+f.L*(p/U.last-1)),side=U.side*k;
   let verdict=U.verdict,vc=U.vc;if(k<0){verdict=verdict.replace(/LONG/g,"§").replace(/SHORT/g,"LONG").replace(/§/g,"SHORT");vc=vc==="up"?"down":vc==="down"?"up":vc}
@@ -929,7 +934,7 @@ function fvSetupHtml(s,S){
   const fF=UMAP[s]||{},und=fF.u?(fF.kind==="stock"?"$"+fF.u:(fF.lab||fF.u)):"the index",sd=S.side;
   const what=!sd?"":fF.L<0?(sd>0?`Buy $${s} = a bet that ${und} <b class="down">falls</b> (this fund moves ${levTxt(fF.L)} opposite ${und}).`:`Sell or avoid $${s} = a bet that ${und} <b class="up">rises</b> (this fund moves ${levTxt(fF.L)} opposite ${und}).`):(fF.L>0?(sd>0?`Buy $${s} = a bet that ${und} <b class="up">rises</b> (${levTxt(fF.L)}).`:`Sell or avoid $${s} = a bet that ${und} <b class="down">falls</b> (${levTxt(fF.L)}).`):"");
   try{if(window.Agree&&S.U&&S.src)Agree.publish("LETF Sniper · level-to-level",S.src,{side:S.U.side,h:"1 h (5-min bars)",txt:S.U.verdict})}catch(e){}
-  $("fvSetup").innerHTML=`<div class="verdict ${S.vc}">${S.verdict.replace(/^(LONG SETUP|SHORT SETUP|LEAN LONG|LEAN SHORT)/,"$1 $"+s)}</div>${S.src?`<div class="sub" style="margin:6px 0 2px;font-size:13px">Read from <b>$${esc(S.src)}</b>'s own chart (the asset this fund tracks), so every $${esc(S.src)} fund shows the same setup: $${esc(S.src)} itself is <b class="${S.U.side>0?"up":S.U.side<0?"down":""}">${S.U.side>0?"leaning up":S.U.side<0?"leaning down":"undecided"}</b>${S.U.side?`; long funds ${S.U.side>0?"buy":"avoid"}, inverse funds ${S.U.side>0?"avoid":"buy"}`:""}. Levels are mapped to this fund through its leverage. ${what}</div>`:what?`<div class="sub" style="margin:6px 0 2px;font-size:13px">No underlying chart: the setup reads this fund's own chart. ${what}</div>`:""}
+  $("fvSetup").innerHTML=`<div class="verdict ${S.vc}">${S.verdict.replace(/^(LONG SETUP|SHORT SETUP|LEAN LONG|LEAN SHORT)/,"$1 $"+s)}</div>${S.noU?`<div class="sub" style="margin:6px 0 2px;font-size:13px">Every $${esc(S.noU)} fund (long and inverse) shows WAIT until the $${esc(S.noU)} chart loads, so they never give opposite bets on one asset. The filters below are from this fund's own chart only: not a setup.</div>`:""}${S.src?`<div class="sub" style="margin:6px 0 2px;font-size:13px">Read from <b>$${esc(S.src)}</b>'s own chart (the asset this fund tracks), so every $${esc(S.src)} fund shows the same setup: $${esc(S.src)} itself is <b class="${S.U.side>0?"up":S.U.side<0?"down":""}">${S.U.side>0?"leaning up":S.U.side<0?"leaning down":"undecided"}</b>${S.U.side?`; long funds ${S.U.side>0?"buy":"avoid"}, inverse funds ${S.U.side>0?"avoid":"buy"}`:""}. Levels are mapped to this fund through its leverage. ${what}</div>`:what?`<div class="sub" style="margin:6px 0 2px;font-size:13px">No underlying chart: the setup reads this fund's own chart. ${what}</div>`:""}
    <div class="loc">${esc(S.loc.t)}</div>
    <div class="filt"><div>${ic(S.st)} <b>Structure</b> <span class="sub">${esc(S.st.t)}</span></div>
    <div>${ic(S.tr)} <b>Trend</b> <span class="sub">30 min ${S.tr.t30.d>0?"up":S.tr.t30.d<0?"down":"mixed"} · 1 hour ${S.tr.t60.d>0?"up":S.tr.t60.d<0?"down":"mixed"}</span></div>
