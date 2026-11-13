@@ -811,7 +811,7 @@ async function uvLoad(u){if(!u)return;const d=UV[u]||(UV[u]={at:0});if(Date.now(
    alike), and it is not sent to the agreement panel or the web. It comes back by itself when the scorecard changes.
    Replay with only the days before each day (no fitted value): the gate shut LEAN on Nov 12 and 13 (−0.53% per plan, n 34)
    and never shut LONG/SHORT SETUP. */
-function leanOff(){const E=typeof window!=="undefined"&&window.EVR;if(!E||!E.ready)return null;const x=E.item("letf","plan.setup.lean.60m");return x&&x.n>=30&&x.recent<0&&x.ev<=0?x:null}
+function leanOff(){const E=typeof window!=="undefined"&&window.EVR;if(!E||!E.ready)return null;const x=E.item("letf","plan.setup.lean.60m");return x&&x.n>=30&&x.recent<0&&(x.ev<=0||x.status==="cut"||x.status==="mute")?x:null}   /* council Nov 13: all data at +0.0016 bp (23:22 UTC scorecard, ruling CUT for decay, newer half -0.21%) opened the gate on noise; the ruling now also keeps it shut */
 function leanGate(S){if(!S)return S;const lo=leanOff();if(!lo)return S;const U=S.U||S;if(!/^LEAN/.test(U.verdict||""))return S;
   const was=(S.verdict||"").split(" · ")[0];
   return{...S,side:0,verdict:`WAIT · ${was} (2 of 3 filters) is off: LEAN plans lost on the newer days of the test`,vc:"dim",plan:null,U:S.U?{...S.U,side:0,plan:null}:S.U,leanOff:lo,leanWas:was}}
