@@ -121,7 +121,7 @@
     // EV governor: when the reversal rule is muted (proven negative EV), the card starts closed (one line above the
     // scanner), its turns are grey, and it says that the turn tended to fail. The page order is set by layout.js (shared).
     const mut = !!(window.EVR && EVR.item("letf", "rev.all.15m") && EVR.factor("letf", "rev.all.15m") === 0);
-    const op = OPEN == null ? !mut : OPEN; LASTOP = op;
+    const op = OPEN == null ? !mut : OPEN; LASTOP = op; if (card.hasAttribute("data-muted") !== mut) card.toggleAttribute("data-muted", mut);   // layout.js puts a muted card below the scanner
     // one line per market (underlying or fund), with its funds
     const G = new Map(); rd.filter(r => r.rev.score >= 0.6).forEach(r => { const k = r.rev.src; const g = G.get(k) || { k, x: r.rev, funds: [] }; g.funds.push(r); G.set(k, g); });
     const L = [...G.values()].sort((a, b) => b.x.score - a.x.score).slice(0, 10);
