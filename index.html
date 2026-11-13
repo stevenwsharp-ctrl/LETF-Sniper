@@ -806,7 +806,17 @@ const UV={};const uTick=u=>/\.X$/.test(u)?u.replace(/\.X$/,"-USD"):u;
 async function uvLoad(u){if(!u)return;const d=UV[u]||(UV[u]={at:0});if(Date.now()-d.at<55000)return;d.at=Date.now();const t=uTick(u);
   const [b,c]=await Promise.all([getChart(t,"5d","5m"),d.bd&&Date.now()-(d.bdAt||0)<3600000?{bars:d.bd}:getChart(t,"1y","1d")]);if(b.bars)d.b5=b.bars;if(c.bars&&c.bars!==d.bd){d.bd=c.bars;d.bdAt=Date.now()}
   if(!d.b5)d.at=Date.now()-45000}   /* no underlying bars: try again in 10 s, not 55 s (the setup shows WAIT until they load) */
-function setupOf(s){
+/* LEAN gate (EV governor, plan.setup.lean.60m): the fund-page plan when only 2 of 3 filters agree. While that test loses on
+   the newer half AND on all its data, a LEAN read shows WAIT with no plan, on every fund of the underlying (long and inverse
+   alike), and it is not sent to the agreement panel or the web. It comes back by itself when the scorecard changes.
+   Replay with only the days before each day (no fitted value): the gate shut LEAN on Nov 12 and 13 (−0.53% per plan, n 34)
+   and never shut LONG/SHORT SETUP. */
+function leanOff(){const E=typeof window!=="undefined"&&window.EVR;if(!E||!E.ready)return null;const x=E.item("letf","plan.setup.lean.60m");return x&&x.n>=30&&x.recent<0&&x.ev<=0?x:null}
+function leanGate(S){if(!S)return S;const lo=leanOff();if(!lo)return S;const U=S.U||S;if(!/^LEAN/.test(U.verdict||""))return S;
+  const was=(S.verdict||"").split(" · ")[0];
+  return{...S,side:0,verdict:`WAIT · ${was} (2 of 3 filters) is off: LEAN plans lost on the newer days of the test`,vc:"dim",plan:null,U:S.U?{...S.U,side:0,plan:null}:S.U,leanOff:lo,leanWas:was}}
+function setupOf(s){return leanGate(setupOf0(s))}
+function setupOf0(s){
   const f=UMAP[s]||{},d0=FV[s],F=setupCore(d0,d0&&d0.b5&&d0.b5.length?(livePx(s)||d0.b5[d0.b5.length-1][4]):null,s),ud=f.u&&UV[f.u];
   /* the fund has an underlying, but its chart is not loaded (Worker error, slow load): the fund's own chart can give the
      long fund and the inverse fund opposite bets on one asset (a ?demo check: SPXL and SPXS both "LONG SETUP"). Show WAIT
@@ -943,8 +953,14 @@ function fvSetupHtml(s,S){
    <span>POC · value area (5 days)</span><b>${fmtPx(S.VP.poc)} · ${fmtPx(S.VP.val)}–${fmtPx(S.VP.vah)}</b></div>
    ${P?`<div class="plan ${P.side>0?"pos":"neg"}"><div class="label" style="margin:0 0 4px">Plan · level to level · limit entry, valid 60 minutes, cancel if not touched</div><div class="kv"><span>Limit ${P.side>0?"buy":"sell"} (entry)</span><b>${fmtPx(P.entry)} (${fmtPct(P.entry/(P.now||P.entry)-1,2)} from now)${P.fillP!=null?` · fills ~${Math.round(P.fillP*100)}% of the time within an hour`:""}</b><span>Limit exit ${P.ext?"(range extension)":"(next HVN)"}</span><b class="${P.side>0?"up":"down"}">${fmtPx(P.tgt)} (${fmtPct(P.tgt/P.entry-1,1)})</b><span>Stop at market (the level behind failed)</span><b>${fmtPx(P.stop)} (${fmtPct(P.stop/P.entry-1,1)})</b><span>Reward : risk</span><b class="${P.rr>=2?"up":P.rr<1?"down":""}">${isFinite(P.rr)?P.rr.toFixed(2)+" : 1":"--"}</b></div>
      ${P.rr<1.5?'<div class="sub" style="margin-top:6px">Reward is small for the risk. The method waits for a better location (the edge of a node).</div>':""}
-     ${P.side<0&&P.inv?`<div class="sub" style="margin-top:6px">A short read on this fund: the inverse sister is <span class="lnk" data-go="${P.inv.s}">$${P.inv.s}</span> (${levTxt(P.inv.L)}).</div>`:""}</div>`:'<div class="sub" style="margin-top:8px">No plan until the filters agree. Price moves from node to node; wait for structure, trend and momentum to line up.</div>'}`;
+     ${planEvHtml(S)}
+     ${P.side<0&&P.inv?`<div class="sub" style="margin-top:6px">A short read on this fund: the inverse sister is <span class="lnk" data-go="${P.inv.s}">$${P.inv.s}</span> (${levTxt(P.inv.L)}).</div>`:""}</div>`:S.leanOff?`<div class="sub" style="margin-top:8px">No plan. ${planEvHtml(S)}</div>`:'<div class="sub" style="margin-top:8px">No plan until the filters agree. Price moves from node to node; wait for structure, trend and momentum to line up.</div>'}`;
 }
+/* the plan's own score (EV governor: plan.setup.full.60m for LONG/SHORT SETUP, plan.setup.lean.60m for LEAN), next to the plan */
+function planEvHtml(S){const E=window.EVR;if(!E||!E.ready||!S)return"";const lean=!!S.leanOff||/^LEAN/.test((S.U||S).verdict||""),x=E.item("letf",lean?"plan.setup.lean.60m":"plan.setup.full.60m"),a=E.item("letf","plan.setup.60m");if(!x)return"";
+  const p=v=>isFinite(v)?(v>=0?"+":"−")+Math.abs(v*100).toFixed(2)+"%":"--",c=v=>v>0?"up":v<0?"down":"",L=Math.abs((UMAP[curF]||{}).L||0),
+    rul={mute:"MUTE (proven negative)",cut:"CUT",back:"BACK (proven positive)",watch:"WATCH (not proven)"}[x.status]||x.status;
+  return`<div class="sub" style="margin-top:6px;font-size:12.5px">Test of ${lean?"LEAN plans (2 of 3 filters)":"LONG / SHORT SETUP plans (all 3 filters)"}, 1 month of 5-minute bars, limit entry counted only when touched: <b class="${c(x.ev)}">${p(x.ev)}</b> per plan on the underlying${L>1?` (about ×${L} on this fund, before decay)`:""}, n ${x.n} · older days <b class="${c(x.older)}">${p(x.older)}</b> · newer days <b class="${c(x.recent)}">${p(x.recent)}</b> · ${esc(rul)}${a&&isFinite(a.fill)?` · ${Math.round(a.fill*100)}% of limits filled`:""}.${S.leanOff?" LEAN comes back by itself when its newer days are above 0.":""}</div>`}
 function fvRadarHtml(s){const R=radarOf(s)||{},t=(k,v,sub,c)=>`<div class="st"><div class="k">${k}</div><div class="v ${c||""}">${v}</div><div class="s">${sub}</div></div>`,last=livePx(s);
   $("fvRadar").innerHTML=[t("Relative volume",isFinite(R.rvol)?R.rvol.toFixed(1)+"×":"--","vs 20-day pace",R.rvol>=2?"up":""),
     t("Move size",isFinite(R.z)?sgn(R.z,1)+"σ":"--",isFinite(R.sdr)?"daily σ "+fmtPct(R.sdr,1):"vs 60-day moves",Math.abs(R.z)>=2?"amber":""),
