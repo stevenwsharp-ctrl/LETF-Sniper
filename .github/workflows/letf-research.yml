@@ -1,0 +1,15 @@
+name: LETF agent research (record only)
+on:
+  push:
+    branches: [letf-research]
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node research/stops.mjs
