@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
+<script src="cal.js?v=1"></script>
 <script>try{var pw=localStorage.getItem("site_width")||"fit";document.documentElement.style.setProperty("--pagew",pw==="fit"?"100%":pw+"px")}catch(e){}</script>
 <script>try{var t=localStorage.getItem("soxx_theme")||(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme="dark"}</script>
 <meta property="og:type" content="website">
@@ -466,10 +467,8 @@ function etEpochMin(d,min){const base=Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.
 /* NYSE calendar (NYSE Group release, Dec 23 2025): market holidays and 1:00 pm early closes. On a holiday the page is
    closed (no day-move alerts from the last session, no live reversal from old bars); on an early-close day the regular
    session ends at 13:00 ET and extended hours at 17:00 ET. */
-const NYSE_HOL=new Set(["2026-01-01","2026-01-19","2026-02-16","2026-04-03","2026-05-25","2026-06-19","2026-07-03","2026-09-07","2026-11-26","2026-12-25",
-  "2027-01-01","2027-01-18","2027-02-15","2027-03-26","2027-05-31","2027-06-18","2027-07-05","2027-09-06","2027-11-25","2027-12-24"]);
-const NYSE_HALF=new Set(["2026-11-27","2026-12-24","2027-11-26"]);
-const sessEnd=d=>NYSE_HALF.has(d)?780:960, sessLen=d=>sessEnd(d)-570;
+const CAL=window.NYSE||{hol:new Set(),half:new Set()};   /* shared cal.js (council, Nov 15 2026): one calendar for SOXX and LETF; if it fails to load, a normal session */
+const NYSE_HOL=CAL.hol, NYSE_HALF=CAL.half, sessEnd=d=>NYSE_HALF.has(d)?780:960, sessLen=d=>sessEnd(d)-570;
 function phaseAt(ms){const e=etInfo(ms);if(e.wd===0||e.wd===6||NYSE_HOL.has(e.d))return"closed";const end=sessEnd(e.d);return e.min<240?"closed":e.min<570?"pre":e.min<end?"regular":e.min<end+240?"post":"closed"}
 function addDays(d,n){const x=new Date(d+"T12:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
 const etParts=t=>{const d=new Date(t);return{date:d.toLocaleDateString("en-CA",{timeZone:"America/New_York"}),hm:d.toLocaleTimeString("en-GB",{timeZone:"America/New_York",hour:"2-digit",minute:"2-digit",hour12:false}),wd:d.toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"short"})}};
