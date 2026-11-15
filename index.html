@@ -463,7 +463,14 @@ function isDST(ms){
 }
 function etInfo(ms){const l=new Date(ms-(isDST(ms)?4:5)*3600000);return{d:l.toISOString().slice(0,10),min:l.getUTCHours()*60+l.getUTCMinutes(),wd:l.getUTCDay()}}
 function etEpochMin(d,min){const base=Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))+min*60000;return Math.floor((base+(isDST(base+5*3600000)?4:5)*3600000)/60000)}
-function phaseAt(ms){const e=etInfo(ms);if(e.wd===0||e.wd===6)return"closed";return e.min<240?"closed":e.min<570?"pre":e.min<960?"regular":e.min<1200?"post":"closed"}
+/* NYSE calendar (NYSE Group release, Dec 23 2025): market holidays and 1:00 pm early closes. On a holiday the page is
+   closed (no day-move alerts from the last session, no live reversal from old bars); on an early-close day the regular
+   session ends at 13:00 ET and extended hours at 17:00 ET. */
+const NYSE_HOL=new Set(["2026-01-01","2026-01-19","2026-02-16","2026-04-03","2026-05-25","2026-06-19","2026-07-03","2026-09-07","2026-11-26","2026-12-25",
+  "2027-01-01","2027-01-18","2027-02-15","2027-03-26","2027-05-31","2027-06-18","2027-07-05","2027-09-06","2027-11-25","2027-12-24"]);
+const NYSE_HALF=new Set(["2026-11-27","2026-12-24","2027-11-26"]);
+const sessEnd=d=>NYSE_HALF.has(d)?780:960, sessLen=d=>sessEnd(d)-570;
+function phaseAt(ms){const e=etInfo(ms);if(e.wd===0||e.wd===6||NYSE_HOL.has(e.d))return"closed";const end=sessEnd(e.d);return e.min<240?"closed":e.min<570?"pre":e.min<end?"regular":e.min<end+240?"post":"closed"}
 function addDays(d,n){const x=new Date(d+"T12:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
 const etParts=t=>{const d=new Date(t);return{date:d.toLocaleDateString("en-CA",{timeZone:"America/New_York"}),hm:d.toLocaleTimeString("en-GB",{timeZone:"America/New_York",hour:"2-digit",minute:"2-digit",hour12:false}),wd:d.toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"short"})}};
 const etDate=(t=Date.now())=>etParts(t).date;
@@ -532,7 +539,7 @@ function rowOf(f){
   const q=QT[f.s];if(!q)return null;const [last,pct0,vol,hi,lo,open,pc,t,xp,xpct,xt]=q;
   const pct=isNum(pct0)?pct0/100:(pc>0&&last>0?last/pc-1:NaN),uq=f.u?QT[f.u]:null,upct=uq&&isNum(uq[1])?uq[1]/100:NaN;
   const s5=snapAgo(f.s,5),s15=snapAgo(f.s,15),m5=s5&&s5[1]>0?last/s5[1]-1:NaN,m15=s15&&s15[1]>0?last/s15[1]-1:NaN;
-  const e=etInfo(Date.now()),ph=phaseAt(Date.now()),minsIn=clamp((e.min-570),1,390);
+  const e=etInfo(Date.now()),ph=phaseAt(Date.now()),minsIn=clamp((e.min-570),1,sessLen(e.d));
   const v15=s15?vol-s15[2]:NaN,pace=ph==="regular"&&isFinite(v15)&&vol>0?v15/(vol/minsIn*15):NaN;
   const ext=xp>0&&xt>t?{p:xp,pct:isNum(xpct)?xpct/100:(last>0?xp/last-1:NaN),t:xt}:null;
   const age=(Date.now()-t)/60000,dv=last*vol;
@@ -867,7 +874,7 @@ function setupCore(d,last,s){
 function radarOf(s){
   const d=FV[s];if(!d)return null;const q=QT[s],last=livePx(s),R={};
   if(d.bd&&d.bd.length>25){const D=d.bd,today=etDate(),prior=D.filter(b=>etInfo(b[0]).d!==today);const v20=mean(prior.slice(-20).map(b=>b[5])),a14=atr(prior.slice(-30),14),pc=prior[prior.length-1][4];
-    const e=etInfo(Date.now()),frac=phaseAt(Date.now())==="regular"?clamp((e.min-570)/390,0.03,1):1,vol=q?q[2]:NaN;
+    const e=etInfo(Date.now()),frac=phaseAt(Date.now())==="regular"?clamp((e.min-570)/sessLen(e.d),0.03,1):1,vol=q?q[2]:NaN;
     R.rvol=isFinite(vol)&&v20>0?vol/(v20*frac):NaN;R.atrPct=a14/pc;R.rangeAtr=q&&q[3]>q[4]?(q[3]-q[4])/a14:NaN;
     const rets=prior.slice(-60).map((b,i,a)=>i?b[4]/a[i-1][4]-1:NaN).filter(isFinite),sdr=sd(rets),pct=q&&q[6]>0?q[0]/q[6]-1:NaN;R.z=sdr>0?pct/sdr:NaN;R.sdr=sdr;
     R.hi52=Math.max(...D.slice(-252).map(b=>b[2]));R.lo52=Math.min(...D.slice(-252).map(b=>b[3]))}
@@ -880,7 +887,7 @@ function radarOf(s){
 /* chart views: [key, label, range, interval]; intraday views include pre-market and after-hours unless "Ext. hours" is off */
 const FVV=[["1d","1D · 1m","1d","1m"],["5d","5D · 5m","5d","5m"],["1mo","1M · 30m","1mo","30m"],["3mo","3M · 1h","3mo","60m"],["6mo","6M · day","6mo","1d"],["ytd","YTD · day","1y","1d"],["1y","1Y · day","1y","1d"],["2y","2Y · day","2y","1d"],["5y","5Y · week","5y","1wk"]];
 const fvDaily=()=>["6mo","ytd","1y","2y","5y"].includes(FVOPT.view);
-function extCut(B){if(FVOPT.ext!==false||fvDaily()||!B)return B;const R=B.filter(b=>{const m=etInfo(b[0]).min;return m>=570&&m<960});return R.length>=10?R:B}
+function extCut(B){if(FVOPT.ext!==false||fvDaily()||!B)return B;const R=B.filter(b=>{const e=etInfo(b[0]);return e.min>=570&&e.min<sessEnd(e.d)});return R.length>=10?R:B}
 async function fvView(s){const v=FVOPT.view;if(["1d","5d","1y"].includes(v))return;const d=FV[s];if(!d)return;d.v=d.v||{};const V=FVV.find(x=>x[0]===v);if(!V||(d.v[v]&&Date.now()-d.v[v].at<300000))return;
   let x=await getChart(s,V[2],V[3]);if(v==="5y"&&(!x.bars||x.bars.length<30))x=await getChart(s,"2y","1wk");   /* older Worker: no 5y range */
   if(x.bars){d.v[v]={at:Date.now(),bars:x.bars};if(curF===s)fvRender(true)}}
@@ -1014,7 +1021,7 @@ function fvDraw(s,S){
   g.strokeStyle=TH.line;g.lineWidth=1;g.fillStyle=TH.mute;g.textAlign="left";
   for(let k=0;k<=5;k++){const p=lo+(hi-lo)*k/5,y=Y(p);g.globalAlpha=0.5;g.beginPath();g.moveTo(pl,y);g.lineTo(pr,y);g.stroke();g.globalAlpha=1;g.fillText(fmtPx(p),pr+6,y+4)}
   /* session shading for extended hours on intraday views */
-  if(!fvDaily()&&FVOPT.ext!==false){g.fillStyle=TH.line;g.globalAlpha=0.25;B.forEach((b,i)=>{const m=etInfo(b[0]).min;if(m<570||m>=960)g.fillRect(X(i)-(pr-pl)/n/2,top,(pr-pl)/n+0.5,bot-top)});g.globalAlpha=1}
+  if(!fvDaily()&&FVOPT.ext!==false){g.fillStyle=TH.line;g.globalAlpha=0.25;B.forEach((b,i)=>{const e=etInfo(b[0]),m=e.min;if(m<570||m>=sessEnd(e.d))g.fillRect(X(i)-(pr-pl)/n/2,top,(pr-pl)/n+0.5,bot-top)});g.globalAlpha=1}
   /* volume profile, drawn from the right edge of the plot */
   const VP=profile(B,200);
   if(FVOPT.vp&&VP){const maxW=(pr-pl)*0.24,rh=Math.max(1,(Y(VP.lo)-Y(VP.lo+VP.step)));
