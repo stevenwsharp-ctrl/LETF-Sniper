@@ -665,10 +665,18 @@ function renderStrip(){
 var ALERTS=[],alSeen={},alertsOn=lsGet("letf_alerts")==="on";
 // EV governor ruling on the 🚀 rule (fast.15m.15m: follow a 4%/2% 15-minute move for the next 15 min). Until the test
 // backs it on both halves, every 🚀 flag, alert and post says that it has no proven edge.
-function fastEdge(){const x=window.EVR&&EVR.item("letf","fast.15m.15m");if(!x)return " · no proven edge, do not chase";
+function fastEdge(id){id=id||"fast.15m.15m";const E=window.EVR,x=E&&E.item("letf",id);if(!x)return " · no proven edge, do not chase";
   if(x.status==="back"&&x.older>0&&x.recent>0)return "";
   if(x.status==="mute"||(x.ev<0&&x.older<0&&x.recent<0&&x.status==="cut"))return " · fast moves tended to come back: do not chase";
-  return " · no proven edge, do not chase"}
+  return fastTod(x,E.item("letf",id+".tgate"))||" · no proven edge, do not chase"}
+// Time of day of the 🚀 move (LETF agent, Nov 17). The walk-forward time gate (.tgate: times of day chosen on the older half,
+// scored on the newer half only) keeps the open hour (09:30–10:30 ET). The same buckets as ev.mjs tod(). In a kept window with
+// both halves of the gate test above 0, the text gives the test result; outside the kept windows, where the rule lost in the
+// test (tod mean below 0), the text says so. No new threshold: the windows and the numbers come from the scorecard each time.
+function fastTod(x,g){if(!g||!g.n||!Array.isArray(g.keep))return "";const m=etInfo(Date.now()).min,p=m<630?"open":m<900?"mid":"close",nm={open:"in the open hour",mid:"mid-day",close:"in the last hour"}[p],t=x.tod&&x.tod[p];
+  if(g.keep.includes(p)&&g.n>=8&&g.ev>0&&g.older>0&&g.recent>0)return ` · ${nm} fast moves held on in the walk-forward test (${sgn(g.ev*100,2)}% per 15 min, n ${g.n}), not proven: limit entry only`;
+  if(!g.keep.includes(p)&&t&&t.n>=8&&t.m<0)return ` · ${nm} fast moves lost in the test (${sgn(t.m*100,2)}% per 15 min, n ${t.n}): do not chase`;
+  return ""}
 // 🚀 push alert (5%/2.5% in 15 min, $1M+ traded): the scorecard tests this exact level (fast.15m.alert). The phone/desktop
 // notification stops while that test loses on the newer half, or while its walk-forward time gate (windows chosen on the
 // older half, scored on the newer half) is muted (council, Nov 10). The alert stays in the list, marked "not pushed".
@@ -683,7 +691,7 @@ function checkAlerts(){
   ROWS.forEach(r=>{if(r.dv<5e5&&!WATCH.includes(r.s))return;const st=r.kind==="stock",th=st?[0.1,0.2,0.3,0.5]:[0.05,0.1,0.15];
     const hit=th.filter(x=>Math.abs(r.pct)>=x);if(hit.length&&ph!=="closed"){const top=hit[hit.length-1];hit.slice(0,-1).forEach(x=>{alSeen[`b:${r.s}:${day}:${Math.sign(r.pct)}${x}`]=alSeen[`b:${r.s}:${day}:${Math.sign(r.pct)}${x}`]||Date.now()});
       alert1(`b:${r.s}:${day}:${Math.sign(r.pct)}${top}`,864e5,`${r.pct>0?"🔥":"🧊"} $${r.s} (${levTxt(r.L)} ${r.kind==="stock"?"$"+r.u:r.lab}) ${fmtPct(r.pct,1)} today at ${fmtPx(r.last)} · ${fmtBig(r.dv)} traded`,r.s,top>=th[1])}
-    if(isFinite(r.m15)&&Math.abs(r.m15)>=(st?0.05:0.025)&&r.dv>=1e6)alert1(`m:${r.s}:${Math.sign(r.m15)}`,30*60000,(q=>`🚀 $${r.s} ${fmtPct(r.m15,1)} in 15 minutes → ${fmtPx(r.last)} (${fmtPct(r.pct,1)} today)${fastEdge()}${q?" · not pushed: this alert lost on the newer days of the test":""}`)(!fastPushOn()),r.s,fastPushOn(),!fastPushOn());
+    if(isFinite(r.m15)&&Math.abs(r.m15)>=(st?0.05:0.025)&&r.dv>=1e6)alert1(`m:${r.s}:${Math.sign(r.m15)}`,30*60000,(q=>`🚀 $${r.s} ${fmtPct(r.m15,1)} in 15 minutes → ${fmtPx(r.last)} (${fmtPct(r.pct,1)} today)${fastEdge("fast.15m.alert")}${q?" · not pushed: this alert lost on the newer days of the test":""}`)(!fastPushOn()),r.s,fastPushOn(),!fastPushOn());
     if(r.pace>=4&&r.dv>=1e6)alert1(`v:${r.s}`,45*60000,`📈 $${r.s} volume surge: last 15 min ${r.pace.toFixed(1)}× its pace today · ${fmtPct(r.pct,1)}`,r.s);
     if(r.ext&&Math.abs(r.ext.pct)>=(st?0.08:0.04))alert1(`x:${r.s}:${day}:${Math.sign(r.ext.pct)}`,864e5,`🌙 $${r.s} ${fmtPct(r.ext.pct,1)} in extended hours → ${fmtPx(r.ext.p)}`,r.s,true);
     const w=FW[r.s];if(w){if(w.above&&r.last>=w.above)alert1(`wa:${r.s}:${w.above}:${day}`,864e5,`🎯 $${r.s} crossed above ${fmtPx(w.above)} → ${fmtPx(r.last)}`,r.s,true);
