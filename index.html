@@ -675,13 +675,18 @@ function fastEdge(id){id=id||"fast.15m.15m";const E=window.EVR,x=E&&E.item("letf
 // test (tod mean below 0), the text says so. No new threshold: the windows and the numbers come from the scorecard each time.
 function fastTod(x,g){if(!g||!g.n||!Array.isArray(g.keep))return "";const m=etInfo(Date.now()).min,p=m<630?"open":m<900?"mid":"close",nm={open:"in the open hour",mid:"mid-day",close:"in the last hour"}[p],t=x.tod&&x.tod[p];
   if(g.keep.includes(p)&&g.n>=8&&g.ev>0&&g.older>0&&g.recent>0)return ` · ${nm} fast moves held on in the walk-forward test (${sgn(g.ev*100,2)}% per 15 min, n ${g.n}), not proven: limit entry only`;
-  if(!g.keep.includes(p)&&t&&t.n>=8&&t.m<0)return ` · ${nm} fast moves lost in the test (${sgn(t.m*100,2)}% per 15 min, n ${t.n}): do not chase`;
+  // LETF agent, Nov 18 (council task): the scorecard now splits each time of day into the older (o) and newer (r) half (todH).
+  // "Lost in the test" shows only while BOTH halves lose, so one bad or one good stretch does not set the text. No new threshold.
+  const H=x.todH&&x.todH[p],both=!H||(H.o&&H.r&&H.o.m<0&&H.r.m<0);
+  if(!g.keep.includes(p)&&t&&t.n>=8&&t.m<0&&both)return ` · ${nm} fast moves lost in the test${H?` on both halves (older ${sgn(H.o.m*100,2)}%, newer ${sgn(H.r.m*100,2)}%`:` (${sgn(t.m*100,2)}%`} per 15 min, n ${t.n}): do not chase`;
   return ""}
 // 🚀 push alert (5%/2.5% in 15 min, $1M+ traded): the scorecard tests this exact level (fast.15m.alert). The phone/desktop
 // notification stops while that test loses on the newer half, or while its walk-forward time gate (windows chosen on the
 // older half, scored on the newer half) is muted (council, Nov 10). The alert stays in the list, marked "not pushed".
 // It comes back by itself when the newer half is above 0 and the gate is not muted.
-function fastPushOn(){if(!window.EVR||!EVR.ready)return true;const a=EVR.item("letf","fast.15m.alert"),g=EVR.item("letf","fast.15m.alert.tgate");
+// LETF agent, Nov 18: no push before the scorecard is loaded (first visit, or no cache for 2 days). Before, the page pushed in that
+// gap, also while fast.15m.alert was MUTE (Nov 18 scorecard: −0.63% per 15 min, z −2.1). The alert stays in the list.
+function fastPushOn(){if(!window.EVR||!EVR.ready)return false;const a=EVR.item("letf","fast.15m.alert"),g=EVR.item("letf","fast.15m.alert.tgate");
   return !(g&&g.factor===0)&&!(a&&a.recent<0)}
 function alert1(key,cool,text,s,hot,quiet){const now=Date.now();if(alSeen[key]&&now-alSeen[key]<cool)return;alSeen[key]=now;ALERTS.unshift({t:now,text,s,hot});if(ALERTS.length>50)ALERTS.pop();
   if(!quiet&&alertsOn&&"Notification"in window&&Notification.permission==="granted")try{new Notification("LETF Sniper",{body:text,tag:key})}catch(e){}renderAlerts()}
@@ -691,7 +696,7 @@ function checkAlerts(){
   ROWS.forEach(r=>{if(r.dv<5e5&&!WATCH.includes(r.s))return;const st=r.kind==="stock",th=st?[0.1,0.2,0.3,0.5]:[0.05,0.1,0.15];
     const hit=th.filter(x=>Math.abs(r.pct)>=x);if(hit.length&&ph!=="closed"){const top=hit[hit.length-1];hit.slice(0,-1).forEach(x=>{alSeen[`b:${r.s}:${day}:${Math.sign(r.pct)}${x}`]=alSeen[`b:${r.s}:${day}:${Math.sign(r.pct)}${x}`]||Date.now()});
       alert1(`b:${r.s}:${day}:${Math.sign(r.pct)}${top}`,864e5,`${r.pct>0?"🔥":"🧊"} $${r.s} (${levTxt(r.L)} ${r.kind==="stock"?"$"+r.u:r.lab}) ${fmtPct(r.pct,1)} today at ${fmtPx(r.last)} · ${fmtBig(r.dv)} traded`,r.s,top>=th[1])}
-    if(isFinite(r.m15)&&Math.abs(r.m15)>=(st?0.05:0.025)&&r.dv>=1e6)alert1(`m:${r.s}:${Math.sign(r.m15)}`,30*60000,(q=>`🚀 $${r.s} ${fmtPct(r.m15,1)} in 15 minutes → ${fmtPx(r.last)} (${fmtPct(r.pct,1)} today)${fastEdge("fast.15m.alert")}${q?" · not pushed: this alert lost on the newer days of the test":""}`)(!fastPushOn()),r.s,fastPushOn(),!fastPushOn());
+    if(isFinite(r.m15)&&Math.abs(r.m15)>=(st?0.05:0.025)&&r.dv>=1e6)alert1(`m:${r.s}:${Math.sign(r.m15)}`,30*60000,(q=>`🚀 $${r.s} ${fmtPct(r.m15,1)} in 15 minutes → ${fmtPx(r.last)} (${fmtPct(r.pct,1)} today)${fastEdge("fast.15m.alert")}${q?(window.EVR&&EVR.ready?" · not pushed: this alert lost on the newer days of the test":" · not pushed: the test scorecard is not loaded yet"):""}`)(!fastPushOn()),r.s,fastPushOn(),!fastPushOn());
     if(r.pace>=4&&r.dv>=1e6)alert1(`v:${r.s}`,45*60000,`📈 $${r.s} volume surge: last 15 min ${r.pace.toFixed(1)}× its pace today · ${fmtPct(r.pct,1)}`,r.s);
     if(r.ext&&Math.abs(r.ext.pct)>=(st?0.08:0.04))alert1(`x:${r.s}:${day}:${Math.sign(r.ext.pct)}`,864e5,`🌙 $${r.s} ${fmtPct(r.ext.pct,1)} in extended hours → ${fmtPx(r.ext.p)}`,r.s,true);
     const w=FW[r.s];if(w){if(w.above&&r.last>=w.above)alert1(`wa:${r.s}:${w.above}:${day}`,864e5,`🎯 $${r.s} crossed above ${fmtPx(w.above)} → ${fmtPx(r.last)}`,r.s,true);
