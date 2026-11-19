@@ -88,7 +88,10 @@
   // newer half is above 0.
   const held = id => { const x = window.EVR && EVR.item("letf", id); return !!(x && x.status !== "back" && x.ev < 0 && x.recent < 0); };
   const heldWhy = id => { const x = window.EVR && EVR.item("letf", id); return x && x.older < 0 ? "both test halves lose" : "the test and its newer half lose"; };
-  const revF = id => held(id) ? 0 : (window.EVR ? EVR.factor("letf", id) : 1);
+  // default OFF (Nov 19): the turn rule was proven negative (MUTE, Nov 8). Before the scorecard is loaded (first visit, no
+  // cache for 2 days, or the fetch failed) the factor was 1, so the scanner showed turn flags at full weight in that gap.
+  const evOk = () => !!(window.EVR && EVR.ready);
+  const revF = id => !evOk() || held(id) ? 0 : EVR.factor("letf", id);
   window.revRow = r => { const a = snapAt(r.s, 1), b = snapAt(r.s, 5); r.m1 = a && a[1] > 0 ? r.last / a[1] - 1 : NaN; r.m5 = b && b[1] > 0 ? r.last / b[1] - 1 : r.m5;
     const u = r.u || null, ut = u ? uT(u) : null; let x = null, src = "", k = 1;   // k: sign that maps the reading to this fund
     const fromQuotes = s => { const c = QC[s]; if (c && Date.now() - c.at < 2e4) return c.x; const M = minutes(s), y = M ? detect(M, M.c.length - 1) : null; QC[s] = { at: Date.now(), x: y }; return y; };
@@ -99,7 +102,7 @@
     r.rev = x ? { ...x, dir: x.side * k, src } : null;
     // EV governor: a muted rule shows no flag. HARD turns are a subset of all turns, so they take the lower factor of the
     // two rulings (before: a HARD turn read only rev.hard.15m, and its "cut" brought the follow flag back while all turns were muted)
-    const evf = window.EVR ? (r.rev && r.rev.score >= 1 ? Math.min(revF("rev.all.15m"), revF("rev.hard.15m")) : revF("rev.all.15m")) : 1; if (r.rev) r.rev.evf = evf;
+    const evf = r.rev && r.rev.score >= 1 ? Math.min(revF("rev.all.15m"), revF("rev.hard.15m")) : revF("rev.all.15m"); if (r.rev) r.rev.evf = evf;
     if (r.rev && r.rev.score >= 0.6 && evf > 0) r.sig.unshift(["⤾", `${r.rev.score >= 1 ? "HARD " : ""}reversal ${r.rev.dir > 0 ? "up" : "down"} (${src}: leg ${pc(r.rev.leg, 1)}, ${Math.round(r.rev.ret * 100)}% given back, ${r.rev.ago} min ago)`]); };
   function readings() { return (typeof ROWS !== "undefined" ? ROWS : []).filter(r => r.rev); }
   // the EV governor's ruling (ev.json, after each US close; 7 days of 1-minute bars on 30 markets)
@@ -132,7 +135,7 @@
     const R = typeof ROWS !== "undefined" ? ROWS : [], rd = readings();
     // EV governor: when the reversal rule is muted (proven negative EV), the card starts closed (one line above the
     // scanner), its turns are grey, and it says that the turn tended to fail. The page order is set by layout.js (shared).
-    const mut = !!(window.EVR && EVR.item("letf", "rev.all.15m") && revF("rev.all.15m") === 0);
+    const mut = !evOk() || !!(EVR.item("letf", "rev.all.15m") && revF("rev.all.15m") === 0);
     const op = OPEN == null ? !mut : OPEN; LASTOP = op; if (card.hasAttribute("data-muted") !== mut) card.toggleAttribute("data-muted", mut);   // layout.js puts a muted card below the scanner
     // one line per market (underlying or fund), with its funds
     const G = new Map(); rd.filter(r => r.rev.score >= 0.6).forEach(r => { const k = r.rev.src; const g = G.get(k) || { k, x: r.rev, funds: [] }; g.funds.push(r); G.set(k, g); });
@@ -141,7 +144,7 @@
     const m1 = R.filter(r => isFinite(r.m1) && r.dv >= 1e6).sort((a, b) => Math.abs(b.m1) - Math.abs(a.m1)).slice(0, 8), m5 = R.filter(r => isFinite(r.m5) && r.dv >= 1e6).sort((a, b) => Math.abs(b.m5) - Math.abs(a.m5)).slice(0, 8);
     const mt = (A, k, lab) => `<table><tr><th class="l">${lab}</th><th>Move</th><th>Price</th></tr>${A.map(r => `<tr data-f="${r.s}"><td class="l"><b>${E(r.s)}</b> <span class="sub">${r.L > 0 ? "+" : ""}${r.L}× ${E(r.u || "")}</span></td><td class="${cl(r[k])}"><b>${pc(r[k], 1)}</b></td><td>${typeof fmtPx === "function" ? fmtPx(r.last) : r.last}</td></tr>`).join("") || `<tr><td class="l sub" colspan="3">Needs ${k === "m1" ? "1" : "5"}+ minutes of live quotes.</td></tr>`}</table>`;
     const S = SUM && SUM["All turns"], H = SUM && SUM["HARD (score 1+)"], bt = (x, lab) => x && x.h15 ? `${lab}: next 15 min kept going the new way <b class="${x.h15.w >= 0.55 ? "up" : x.h15.w < 0.45 ? "down" : ""}">${Math.round(x.h15.w * 100)}%</b> of ${x.h15.n} (mean ${pc(x.h15.m, 2)}; 5 min ${x.h5 ? Math.round(x.h5.w * 100) + "%" : "–"}, 30 min ${x.h30 ? Math.round(x.h30.w * 100) + "%" : "–"})` : "";
-    card.innerHTML = `<details${op ? " open" : ""}><summary class="label" style="cursor:pointer">⤾ Hard reversal detector · and the fastest 1-minute and 5-minute moves${mut ? ` <span class="tg" style="background:var(--dim,#7a8699)">MUTED · ${EVR.item("letf", "rev.all.15m").status === "mute" ? "proven negative EV" : heldWhy("rev.all.15m")}</span>` : ""}</summary>
+    card.innerHTML = `<details${op ? " open" : ""}><summary class="label" style="cursor:pointer">⤾ Hard reversal detector · and the fastest 1-minute and 5-minute moves${mut ? ` <span class="tg" style="background:var(--dim,#7a8699)">MUTED · ${!evOk() ? "the test scorecard is not loaded yet" : EVR.item("letf", "rev.all.15m").status === "mute" ? "proven negative EV" : heldWhy("rev.all.15m")}</span>` : ""}</summary>
       <div class="r3"><div><div class="tw" style="overflow-x:auto"><table><tr><th class="l">Market</th><th class="l">Turn</th><th>Leg</th><th>Given back</th><th>Since</th><th>Score</th><th class="l">Funds</th></tr>
         ${L.map(g => `<tr class="${g.x.score >= 1 && !mut ? "hard" : ""}" data-f="${g.funds[0].s}"${mut ? ' style="opacity:.55"' : ""}><td class="l"><b>${E(g.k)}</b></td><td class="l"><span class="tg" style="background:${g.x.side > 0 ? "var(--up,#19d38a)" : "var(--down,#ff4d5e)"}">${g.x.score >= 1 ? "HARD " : ""}${g.x.side > 0 ? "BOTTOM ▲" : "TOP ▼"}</span></td><td>${pc(g.x.side > 0 ? -g.x.leg : g.x.leg, 1)} <span class="sub">${g.x.legMin} min</span></td><td>${Math.round(g.x.ret * 100)}%</td><td>${g.x.ago} min</td><td><b>${g.x.score.toFixed(2)}</b></td><td class="l">${fundsTxt(g)}</td></tr>`).join("") || `<tr><td class="l sub" colspan="7">${P() ? "No reversal now. A reversal = a big leg in the last 30 minutes, then half or more given back within 8 minutes." : "Add the Worker URL in Settings for 1-minute bars (the page's own quotes still work after 15 minutes)."}</td></tr>`}</table></div>
         <div class="sub" style="font-size:11.5px;margin-top:4px;line-height:1.45">${S ? `Test on the last 5 days of 1-minute bars (${Object.keys(BT).length} markets). ${bt(S, "All turns")}. ${bt(H, "HARD only")}. 50% = a coin flip.` : "The test on the last 5 days of 1-minute bars runs after the first minute."} A bottom is ▲ for long funds and ▼ for inverse funds on the same underlying. ${mut ? `<b>Muted:</b> on the EV test, trading the new direction after these turns lost money (the old direction tended to come back). Do not trade a turn from this table.` : "A reversal is a warning and a chance, not an order: wait for the next 1-minute bar to hold, and use a limit entry."}</div></div>
