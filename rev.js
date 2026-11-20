@@ -90,8 +90,10 @@
   const heldWhy = id => { const x = window.EVR && EVR.item("letf", id); return x && x.older < 0 ? "both test halves lose" : "the test and its newer half lose"; };
   // default OFF (Nov 19): the turn rule was proven negative (MUTE, Nov 8). Before the scorecard is loaded (first visit, no
   // cache for 2 days, or the fetch failed) the factor was 1, so the scanner showed turn flags at full weight in that gap.
+  // Nov 20 (council task): the default-OFF case now comes from the shared EVR.factor(tr, id, { off: true }) (evrules.js v2),
+  // the same result as the own check before. evOk() stays for the card text.
   const evOk = () => !!(window.EVR && EVR.ready);
-  const revF = id => !evOk() || held(id) ? 0 : EVR.factor("letf", id);
+  const revF = id => !window.EVR || held(id) ? 0 : EVR.factor("letf", id, { off: true });
   window.revRow = r => { const a = snapAt(r.s, 1), b = snapAt(r.s, 5); r.m1 = a && a[1] > 0 ? r.last / a[1] - 1 : NaN; r.m5 = b && b[1] > 0 ? r.last / b[1] - 1 : r.m5;
     const u = r.u || null, ut = u ? uT(u) : null; let x = null, src = "", k = 1;   // k: sign that maps the reading to this fund
     const fromQuotes = s => { const c = QC[s]; if (c && Date.now() - c.at < 2e4) return c.x; const M = minutes(s), y = M ? detect(M, M.c.length - 1) : null; QC[s] = { at: Date.now(), x: y }; return y; };
