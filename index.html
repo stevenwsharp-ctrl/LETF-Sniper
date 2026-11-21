@@ -973,11 +973,24 @@ function fvSetupHtml(s,S){
    <div>${ic(S.mo)} <b>Momentum</b> <span class="sub">${esc(S.mo.t)}</span></div></div>
    <div class="kv" style="margin-top:10px"><span>Next HVN up</span><b>${S.nUp!=null?fmtPx(S.nUp)+" ("+fmtPct(S.nUp/S.last-1,1)+")":"none · open air above"}</b><span>Next HVN down</span><b>${S.nDn!=null?fmtPx(S.nDn)+" ("+fmtPct(S.nDn/S.last-1,1)+")":"none · open air below"}</b>
    <span>POC · value area (5 days)</span><b>${fmtPx(S.VP.poc)} · ${fmtPx(S.VP.val)}–${fmtPx(S.VP.vah)}</b></div>
-   ${P?`<div class="plan ${P.side>0?"pos":"neg"}"><div class="label" style="margin:0 0 4px">Plan · level to level · limit entry, valid 60 minutes, cancel if not touched</div><div class="kv"><span>Limit ${P.side>0?"buy":"sell"} (entry)</span><b>${fmtPx(P.entry)} (${fmtPct(P.entry/(P.now||P.entry)-1,2)} from now)${P.fillP!=null?` · fills ~${Math.round(P.fillP*100)}% of the time within an hour`:""}</b><span>Limit exit ${P.ext?"(range extension)":"(next HVN)"}</span><b class="${P.side>0?"up":"down"}">${fmtPx(P.tgt)} (${fmtPct(P.tgt/P.entry-1,1)})</b><span>Stop at market (the level behind failed)</span><b>${fmtPx(P.stop)} (${fmtPct(P.stop/P.entry-1,1)})</b><span>Reward : risk</span><b class="${P.rr>=2?"up":P.rr<1?"down":""}">${isFinite(P.rr)?P.rr.toFixed(2)+" : 1":"--"}</b></div>
+   ${P?`<div class="plan ${P.side>0?"pos":"neg"}"><div class="label" style="margin:0 0 4px">Plan · level to level · limit entry, valid 60 minutes, cancel if not touched</div><div class="kv"><span>Limit ${P.side>0?"buy":"sell"} (entry)</span><b>${fmtPx(P.entry)} (${fmtPct(P.entry/(P.now||P.entry)-1,2)} from now)${P.fillP!=null?` · fills ~${Math.round(P.fillP*100)}% of the time within an hour`:""}</b><span>Limit exit ${P.ext?"(range extension)":"(next HVN)"}</span><b class="${P.side>0?"up":"down"}">${fmtPx(P.tgt)} (${fmtPct(P.tgt/P.entry-1,1)})</b>${stopOff(S)?`<span>Time exit at market</span><b>60 min after the fill (if the target is not hit)</b><span>Level behind · no stop order</span><b>${fmtPx(P.stop)} (${fmtPct(P.stop/P.entry-1,1)})</b><span>Reward : distance to the level behind</span>`:`<span>Stop at market (the level behind failed)</span><b>${fmtPx(P.stop)} (${fmtPct(P.stop/P.entry-1,1)})</b><span>Reward : risk</span>`}<b class="${P.rr>=2?"up":P.rr<1?"down":""}">${isFinite(P.rr)?P.rr.toFixed(2)+" : 1":"--"}</b></div>
      ${P.rr<1.5?'<div class="sub" style="margin-top:6px">Reward is small for the risk. The method waits for a better location (the edge of a node).</div>':""}
-     ${planEvHtml(S)}
+     ${stopOffHtml(S)}${planEvHtml(S)}
      ${P.side<0&&P.inv?`<div class="sub" style="margin-top:6px">A short read on this fund: the inverse sister is <span class="lnk" data-go="${P.inv.s}">$${P.inv.s}</span> (${levTxt(P.inv.L)}).</div>`:""}</div>`:S.leanOff?`<div class="sub" style="margin-top:8px">No plan. ${planEvHtml(S)}</div>`:'<div class="sub" style="margin-top:8px">No plan until the filters agree. Price moves from node to node; wait for structure, trend and momentum to line up.</div>'}`;
 }
+/* LETF agent Nov 21 2026: the plan stop has negative EV. Test (scorecard nostop on plan.setup.*, and research/nostop.mjs on branch
+   letf-research, same plans paired): the same plans held to the target or the 60-min time exit, with NO stop, did better on the OLDER
+   half and on the NEWER half, for all plans (+0.09% / +0.05% against +0.06% / −0.04%) and for full SETUP plans (+0.21% / +0.19% against
+   +0.21% / +0.09%). Paired, all plans: +0.08% per plan, z 3.4; by day z 2.7. Expanding walk-forward (choose on earlier days only):
+   "no stop" is the choice on every day from Nov 9. The stop exits lose −1.02%; the same plans held to 60 min lose −0.50%.
+   Rule (no fitted value): no stop order while nostop beats the stop on BOTH halves, n 100+, for the shown kind AND for all plans.
+   Not loaded / not true → the stop stays (the old plan). It comes back by itself. The 60-min time exit is the risk limit (as in the test). */
+function stopOff(S){const E=typeof window!=="undefined"&&window.EVR;if(!E||!E.ready||!S||!S.plan)return null;const lean=/^LEAN/.test((S.U||S).verdict||""),
+  x=E.item("letf",lean?"plan.setup.lean.60m":"plan.setup.full.60m"),a=E.item("letf","plan.setup.60m"),
+  ok=y=>!!(y&&y.nostop&&y.nostop.n>=100&&isFinite(y.older)&&isFinite(y.recent)&&y.nostop.older>y.older&&y.nostop.recent>y.recent);
+  return ok(x)&&ok(a)?{x,a}:null}
+function stopOffHtml(S){const o=stopOff(S);if(!o)return"";const p=v=>isFinite(v)?(v>=0?"+":"−")+Math.abs(v*100).toFixed(3)+"%":"--",c=v=>v>0?"up":v<0?"down":"",x=o.x,a=o.a,b=a.byExit||{};
+  return`<div class="sub" style="margin-top:6px;font-size:12.5px"><b>No stop order on this plan.</b> In the test the same plans with no stop (exit at the target or at market 60 min after the fill) did better on the older days (<b class="${c(x.nostop.older)}">${p(x.nostop.older)}</b> against <b class="${c(x.older)}">${p(x.older)}</b> with the stop) and on the newer days (<b class="${c(x.nostop.recent)}">${p(x.nostop.recent)}</b> against <b class="${c(x.recent)}">${p(x.recent)}</b>), per plan on the underlying. All plans: older <b class="${c(a.nostop.older)}">${p(a.nostop.older)}</b> against <b class="${c(a.older)}">${p(a.older)}</b>, newer <b class="${c(a.nostop.recent)}">${p(a.nostop.recent)}</b> against <b class="${c(a.recent)}">${p(a.recent)}</b>${b.stop&&b.stop.n?`; the stop exits lost <b class="down">${p(b.stop.m)}</b> each (n ${b.stop.n}): price touched the level behind and then came back part of the way`:""}. Your risk limit is the 60-minute time exit. The stop comes back by itself if the test changes.</div>`}
 /* the plan's own score (EV governor: plan.setup.full.60m for LONG/SHORT SETUP, plan.setup.lean.60m for LEAN), next to the plan */
 function planEvHtml(S){const E=window.EVR;if(!E||!E.ready||!S)return"";const lean=!!S.leanOff||/^LEAN/.test((S.U||S).verdict||""),x=E.item("letf",lean?"plan.setup.lean.60m":"plan.setup.full.60m"),a=E.item("letf","plan.setup.60m");if(!x)return"";
   const p=v=>isFinite(v)?(v>=0?"+":"−")+Math.abs(v*100).toFixed(2)+"%":"--",c=v=>v>0?"up":v<0?"down":"",L=Math.abs((UMAP[curF]||{}).L||0),
@@ -1054,7 +1067,7 @@ function fvDraw(s,S){
   const vmax=Math.max(...B.map(b=>b[5]))||1;B.forEach((b,i)=>{g.fillStyle=b[4]>=b[1]?TH.up:TH.down;g.globalAlpha=0.45;const h=b[5]/vmax*(volH-6);g.fillRect(X(i)-bw/2,Hh-20-h,bw,h)});g.globalAlpha=1;
   /* plan levels */
   if(FVOPT.lv&&S&&S.plan){const P=S.plan,lab=(p,c,t)=>{const y=Y(p);g.strokeStyle=c;g.lineWidth=1.5;g.beginPath();g.moveTo(pl+(pr-pl)*0.55,y);g.lineTo(pr,y);g.stroke();g.fillStyle=c;g.fillRect(pr,y-8,axW,16);g.fillStyle=TH.bg;g.fillText(t,pr+4,y+4)};
-    lab(P.tgt,TH.up,"TGT");lab(P.stop,TH.down,"STOP")}
+    lab(P.tgt,TH.up,"TGT");lab(P.stop,TH.down,stopOff(S)?"LVL":"STOP")}
   /* last price tag */
   const lp=livePx(s)||B[n-1][4];if(lp>=lo&&lp<=hi){const y=Y(lp);g.strokeStyle=TH.ink;g.globalAlpha=0.5;g.setLineDash([2,2]);g.beginPath();g.moveTo(pl,y);g.lineTo(pr,y);g.stroke();g.setLineDash([]);g.globalAlpha=1;g.fillStyle=TH.ink;g.fillRect(pr,y-8,axW,16);g.fillStyle=TH.bg;g.fillText(fmtPx(lp),pr+4,y+4)}
   /* time labels */
@@ -1077,7 +1090,7 @@ document.addEventListener("click",e=>{
 $("fvBack").onclick=$("ctBack").onclick=()=>{location.hash="#/"};
 $("fvStar").onclick=()=>{const s=curF;WATCH=WATCH.includes(s)?WATCH.filter(x=>x!==s):[...WATCH,s];saveW();fvHead()};
 function fvSummary(){const s=curF,r=ROWS.find(x=>x.s===s),S=setupOf(s),f=UMAP[s]||{};if(!r)return`$${s}`;
-  return[`$${s} (${levTxt(f.L)} ${f.kind==="stock"?"$"+f.u:f.lab||""}) ${fmtPx(r.last)} ${fmtPct(r.pct,1)} today, ${fmtBig(r.dv)} traded.`,S?S.verdict.split(" · ")[0]+(S.plan?` → next node ${fmtPx(S.plan.tgt)}, stop ${fmtPx(S.plan.stop)}`:""):"",S&&S.nUp!=null?`Next HVN up ${fmtPx(S.nUp)}`:"",S&&S.nDn!=null?`down ${fmtPx(S.nDn)}`:""].filter(Boolean).join(" ").replace(/  +/g," ")}
+  return[`$${s} (${levTxt(f.L)} ${f.kind==="stock"?"$"+f.u:f.lab||""}) ${fmtPx(r.last)} ${fmtPct(r.pct,1)} today, ${fmtBig(r.dv)} traded.`,S?S.verdict.split(" · ")[0]+(S.plan?` → next node ${fmtPx(S.plan.tgt)}, ${stopOff(S)?"no stop (60-min time exit), level behind":"stop"} ${fmtPx(S.plan.stop)}`:""):"",S&&S.nUp!=null?`Next HVN up ${fmtPx(S.nUp)}`:"",S&&S.nDn!=null?`down ${fmtPx(S.nDn)}`:""].filter(Boolean).join(" ").replace(/  +/g," ")}
 $("fvPost").onclick=()=>xIntent(fvSummary(),curF);$("fvCopy").onclick=e=>copyText(fvSummary(),e.target);
 /* ---------- demo bars ---------- */
 function demoBars(s,range,interval){const f=UMAP[s]||{L:2},q=QT[s],last=q?q[0]:20,step={"1m":60e3,"5m":3e5,"1d":864e5}[interval]||6e4,n=interval==="1d"?250:interval==="5m"?390:390;
