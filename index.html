@@ -469,6 +469,11 @@ function etEpochMin(d,min){const base=Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.
    session ends at 13:00 ET and extended hours at 17:00 ET. */
 const CAL=window.NYSE||{hol:new Set(),half:new Set()};   /* shared cal.js (council, Nov 15 2026): one calendar for SOXX and LETF; if it fails to load, a normal session */
 const NYSE_HOL=CAL.hol, NYSE_HALF=CAL.half, sessEnd=d=>NYSE_HALF.has(d)?780:960, sessLen=d=>sessEnd(d)-570;
+/* Day-change base (Nov 24 2026 fix, same as SOXX Sniper). In pre-market the quote sources still hold the last session:
+   price base must be the last regular close, not the close before it. Roll only on a trading day after 4:00 am ET, when the
+   price is from today and the last close is from an earlier day. */
+function rolledBase(pc,lastC,lastMs){const e=etInfo(Date.now()),C=window.NYSE;if(!(lastC>0)||!(lastMs>0)||e.wd===0||e.wd===6||(C&&C.isHol(e.d))||e.min<240)return pc;return etInfo(lastMs).d<e.d?lastC:pc}
+function extBase(x){const pc=x.prevClose||x.regularClose;return x.time>0&&etInfo(x.time).d===etInfo(Date.now()).d?rolledBase(pc,x.regularClose,x.regTime):pc}
 function phaseAt(ms){const e=etInfo(ms);if(e.wd===0||e.wd===6||NYSE_HOL.has(e.d))return"closed";const end=sessEnd(e.d);return e.min<240?"closed":e.min<570?"pre":e.min<end?"regular":e.min<end+240?"post":"closed"}
 function addDays(d,n){const x=new Date(d+"T12:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
 const etParts=t=>{const d=new Date(t);return{date:d.toLocaleDateString("en-CA",{timeZone:"America/New_York"}),hm:d.toLocaleTimeString("en-GB",{timeZone:"America/New_York",hour:"2-digit",minute:"2-digit",hour12:false}),wd:d.toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"short"})}};
@@ -654,7 +659,7 @@ function renderEdge(){
 /* ---------- market strip (index levels from the Worker) ---------- */
 var IDXQ={};const IDX_LIST=[["^GSPC","S&P 500"],["^IXIC","Nasdaq"],["^DJI","Dow"],["^RUT","Russell 2000"],["^SOX","SOX"],["^VIX","VIX"],["^TNX","10Y yield"]];
 async function pollIdx(){if(demo){IDX_LIST.forEach(([k],i)=>{const b=[6735,22650,46820,2480,6123,16.4,4.12][i];const q=IDXQ[k]||(IDXQ[k]={pc:b,p:b});q.p*=1+(Math.random()-0.5)*0.0015});return}
-  const p=proxy();if(!p)return;try{const j=await(await fetch(`${p}/ext?t=${IDX_LIST.map(x=>x[0]).join(",")}`)).json();for(const k in j.quotes){const x=j.quotes[k];IDXQ[k]={p:x.price,pc:x.prevClose||x.regularClose}}}catch(e){}}
+  const p=proxy();if(!p)return;try{const j=await(await fetch(`${p}/ext?t=${IDX_LIST.map(x=>x[0]).join(",")}`)).json();for(const k in j.quotes){const x=j.quotes[k];IDXQ[k]={p:x.price,pc:extBase(x)}}}catch(e){}}
 function renderStrip(){
   $("mStrip").innerHTML=IDX_LIST.map(([k,n])=>{const q=IDXQ[k];if(!q||!(q.p>0)||!(q.pc>0))return"";const ch=q.p-q.pc,pct=q.p/q.pc-1,inv=k==="^VIX"||k==="^TNX";
     return`<div class="mi"><div class="n">${n}</div><div class="v">${k==="^TNX"?q.p.toFixed(3)+"%":q.p.toLocaleString("en-US",{maximumFractionDigits:2})}</div><div class="c ${cls(inv?-ch:ch)}">${k==="^TNX"?sgn(ch*100,1)+" bp":sgn(ch)+" ("+fmtPct(pct)+")"}</div></div>`}).join("")+
