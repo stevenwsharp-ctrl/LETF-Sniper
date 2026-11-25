@@ -15,7 +15,7 @@
   const card = document.createElement("section"); card.className = "card"; card.id = "revCard"; card.style.marginBottom = "12px"; host.before(card);
   const st = document.createElement("style"); st.textContent = `#revCard table{width:100%;border-collapse:collapse;font:12px var(--mono,monospace)}#revCard th,#revCard td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}#revCard th{color:var(--dim,var(--faint));font-weight:600}#revCard td.l,#revCard th.l{text-align:left}#revCard .r3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}@media(max-width:1100px){#revCard .r3{grid-template-columns:1fr}}#revCard .hard{background:rgba(255,77,94,.08)}#revCard .tg{display:inline-block;font:700 10.5px var(--mono,monospace);border-radius:5px;padding:1px 6px;color:#fff}#revCard tr[data-f]{cursor:pointer}`;
   document.head.appendChild(st);
-  const P = () => { try { return (localStorage.getItem("soxx_fred_proxy") || "").trim().replace(/\/+$/, ""); } catch (e) { return ""; } };
+  const P = () => { try { return (localStorage.getItem("soxx_fred_proxy") || "").trim().replace(/\/+$/, "") || "https://soxx-sniper-fred.sharpventures.workers.dev"; } catch (e) { return "https://soxx-sniper-fred.sharpventures.workers.dev"; } };
   const pc = (x, d) => isFinite(x) ? (x >= 0 ? "+" : "") + (x * 100).toFixed(d == null ? 2 : d) + "%" : "--", cl = x => x > 0 ? "up" : x < 0 ? "down" : "";
   const E = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   // ---------- this page's quotes: kept in this browser for 50 minutes (a reload keeps the 1-min and 5-min moves) ----------

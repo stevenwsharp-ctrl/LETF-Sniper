@@ -504,7 +504,9 @@ const fmtVol=v=>!isFinite(v)?"--":v>=1e9?(v/1e9).toFixed(2)+"B":v>=1e6?(v/1e6).t
 const fmtInt=x=>isNum(x)?Math.round(x).toLocaleString("en-US"):"--";
 const sgn=(x,d=2)=>isFinite(x)?(x>=0?"+":"−")+Math.abs(x).toFixed(d):"--";
 const levTxt=L=>(L<0?"−":"+")+Math.abs(L)+"×";
-const proxy=()=>{const v=(lsGet("soxx_fred_proxy")||"").trim().replace(/\/+$/,"");return v||null};
+// the site's own Worker is the default, so every visitor gets live data with no setup (a saved URL still wins)
+const WORKER0="https://soxx-sniper-fred.sharpventures.workers.dev";
+const proxy=()=>{const v=(lsGet("soxx_fred_proxy")||"").trim().replace(/\/+$/,"");return v||WORKER0};
 var demo=false;
 
 /* ---------- data: universe (12 h) and quotes (every 12 s) ---------- */
@@ -764,8 +766,8 @@ async function start(){
 }
 $("scanMore").onclick=()=>{SC.n+=50;render(true)};
 /* ---------- settings ---------- */
-$("setBtn").onclick=()=>{$("wkIn").value=proxy()||"";$("modal").classList.add("show")};$("mClose").onclick=()=>$("modal").classList.remove("show");
-$("wkSave").onclick=async()=>{const v=$("wkIn").value.trim().replace(/\/+$/,"");if(!/^https:\/\//.test(v)){$("wkMsg").textContent="Enter the full https:// address of your Worker.";return}
+$("setBtn").onclick=()=>{$("wkIn").value=(lsGet("soxx_fred_proxy")||"").trim();$("modal").classList.add("show")};$("mClose").onclick=()=>$("modal").classList.remove("show");
+$("wkSave").onclick=async()=>{let v=$("wkIn").value.trim().replace(/\/+$/,"");if(!v)v=WORKER0;if(!/^https:\/\//.test(v)){$("wkMsg").textContent="Enter the full https:// address of your Worker.";return}
   lsSet("soxx_fred_proxy",v);$("wkMsg").textContent="Connecting…";demo=false;try{const j=await(await fetch(v+"/letf/list")).json();if(j.status==="ok"){$("wkMsg").textContent=`Connected: ${j.n} funds.`;lsSet("letf_list","");await loadUniverse(true);await tick();setTimeout(()=>$("modal").classList.remove("show"),800)}else $("wkMsg").textContent="Worker answered: "+(j.error||"error")}catch(e){$("wkMsg").textContent="The Worker did not answer /letf/list. Deploy the new Worker code."}};
 $("demoBtn").onclick=async()=>{demo=true;$("modal").classList.remove("show");await loadUniverse();await tick()};
 $("themeBtn").onclick=()=>setTheme(document.documentElement.dataset.theme==="light"?"dark":"light");
