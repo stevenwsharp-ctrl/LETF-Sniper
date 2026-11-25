@@ -380,21 +380,8 @@ footer{margin-top:24px;font-size:12px;color:var(--mute);line-height:1.7}
       <div id="alertList" class="alerts"></div>
     </section>
 
-    <section class="grid2" id="proofRow">
+    <section id="proofRow" style="margin-bottom:12px">
       <div class="card"><div class="label">How LETF Sniper reads a big mover</div><div class="howto" id="howTo"></div></div>
-      <div class="card pro" id="proCard">
-        <div class="label">LETF Sniper Pro · early access</div>
-        <h3>Catch the next AXTX before the crowd</h3>
-        <ul class="prol">
-          <li><span class="live">Live now</span> Every US leveraged and inverse ETF (about 750) scanned every 12 seconds, with momentum, volume surge and extended hours</li>
-          <li><span class="live">Live now</span> Volume profile with high- and low-volume nodes, and a level-to-level setup (structure, trend, momentum) on every fund</li>
-          <li><span class="live">Live now</span> Underlying vs. fund tracking, leverage decay cost, news and StockTwits pulse per fund</li>
-          <li><span class="live">Live now</span> Alerts and ready-to-post updates for X and StockTwits</li>
-          <li><span class="soon">Planned</span> Alerts to your phone and email, even with the page closed</li>
-          <li><span class="soon">Planned</span> Setup track record: every level-to-level call scored over its last 100 cases</li>
-        </ul>
-        <div class="row" style="margin-top:12px"><a class="cta" href="#/contact?pro">Get early access</a><span class="sub">Founding members get the best price.</span></div>
-      </div>
     </section>
   </div>
 
@@ -429,11 +416,11 @@ footer{margin-top:24px;font-size:12px;color:var(--mute);line-height:1.7}
     <div class="sv-top"><button id="ctBack">← Scanner</button></div>
     <section class="card contact">
       <div class="label">Contact</div>
-      <h2>Questions, feedback or paid access?</h2>
+      <h2>Questions or feedback?</h2>
       <p class="sub" style="font-size:13px">Write directly. Every message is read.</p>
-      <div class="ctmail"><a href="mailto:sniperdesk.tribunal635@passmail.net?subject=LETF%20Sniper">sniperdesk.tribunal635@passmail.net</a><button id="ctCopy">Copy email</button></div>
+      <div class="ctmail"><a href="mailto:steven.w.sharp@gmail.com?subject=LETF%20Sniper">steven.w.sharp@gmail.com</a><button id="ctCopy">Copy email</button></div>
       <form id="ctForm" class="ctform">
-        <label>Topic<select id="ctTopic"><option>Feedback</option><option>Subscription / paid access</option><option>Bug report</option><option>Feature request</option><option>Partnership or press</option><option>Other</option></select></label>
+        <label>Topic<select id="ctTopic"><option>Feedback</option><option>Bug report</option><option>Feature request</option><option>Partnership or press</option><option>Other</option></select></label>
         <label>Your name<input id="ctName" maxlength="80" autocomplete="name"></label>
         <label class="full">Message<textarea id="ctMsg" rows="6" maxlength="4000" required></textarea></label>
         <div class="full row"><button type="submit" class="x">Write email</button><span class="sub">This opens your email app with the message filled in. The site does not send or store anything.</span></div>
@@ -442,7 +429,7 @@ footer{margin-top:24px;font-size:12px;color:var(--mute);line-height:1.7}
   </div>
 
   <footer>
-    <div class="ftc">Contact: <a href="#/contact">sniperdesk.tribunal635@passmail.net</a> · <a href="#/contact">Contact page</a> · Sister site: <a href="../SOXX-Sniper/">SOXX Sniper</a></div>
+    <div class="ftc">Contact: <a href="#/contact">steven.w.sharp@gmail.com</a> · <a href="#/contact">Contact page</a> · Sister site: <a href="../SOXX-Sniper/">SOXX Sniper</a></div>
     Fund list: Nasdaq ETF screener (refreshed twice a day). Quotes: StockTwits batch quotes (most active funds real-time; thinly traded funds show their last trade) and Yahoo Finance for charts. Leveraged ETFs reset daily and lose value in choppy markets; they are made for short holding periods. Nothing here is investment advice.
   </footer>
 </div>
@@ -772,8 +759,8 @@ $("wkSave").onclick=async()=>{let v=$("wkIn").value.trim().replace(/\/+$/,"");if
 $("demoBtn").onclick=async()=>{demo=true;$("modal").classList.remove("show");await loadUniverse();await tick()};
 $("themeBtn").onclick=()=>setTheme(document.documentElement.dataset.theme==="light"?"dark":"light");
 /* ---------- contact ---------- */
-$("ctCopy").onclick=e=>copyText("sniperdesk.tribunal635@passmail.net",e.target);
-$("ctForm").onsubmit=e=>{e.preventDefault();const t=$("ctTopic").value,n=$("ctName").value.trim(),m=$("ctMsg").value.trim();if(!m)return;location.href="mailto:sniperdesk.tribunal635@passmail.net?subject="+encodeURIComponent("LETF Sniper · "+t)+"&body="+encodeURIComponent(m+(n?"\n\n— "+n:""))};
+$("ctCopy").onclick=e=>copyText("steven.w.sharp@gmail.com",e.target);
+$("ctForm").onsubmit=e=>{e.preventDefault();const t=$("ctTopic").value,n=$("ctName").value.trim(),m=$("ctMsg").value.trim();if(!m)return;location.href="mailto:steven.w.sharp@gmail.com?subject="+encodeURIComponent("LETF Sniper · "+t)+"&body="+encodeURIComponent(m+(n?"\n\n— "+n:""))};
 /* ---------- demo data ---------- */
 function demoUniverse(){
   const S=[["AXTX",2,"AXTI","stock"],["AXTU",2,"AXTI","stock"],["SPCH",2,"SPCX","stock"],["NVDL",2,"NVDA","stock"],["NVDD",-1,"NVDA","stock"],["TSLL",2,"TSLA","stock"],["TSLQ",-2,"TSLA","stock"],["MSTU",2,"MSTR","stock"],["MSTZ",-2,"MSTR","stock"],["CONL",2,"COIN","stock"],["AMDL",2,"AMD","stock"],["PLTU",2,"PLTR","stock"],["SMCX",2,"SMCI","stock"],["IONX",2,"IONQ","stock"],["RGTX",2,"RGTI","stock"],["OKLL",2,"OKLO","stock"],["HOOX",2,"HOOD","stock"],["AAPU",2,"AAPL","stock"],["METU",2,"META","stock"],["CRWG",2,"CRWV","stock"],
@@ -1135,7 +1122,7 @@ function route(){const h=location.hash||"#/";
   const m=h.match(/^#\/f\/([A-Z0-9.\-]{1,10})/i);
   if(m){const s=m[1].toUpperCase();if(s!==curF)fvOpen(s);return}
   clearInterval(fvT1);clearInterval(fvT2);curF=null;$("fundView").style.display="none";
-  if(/^#\/contact/.test(h)){curC=true;$("mainView").style.display="none";$("contactView").style.display="";if(/pro/.test(h))$("ctTopic").value="Subscription / paid access";window.scrollTo(0,0);return}
+  if(/^#\/contact/.test(h)){curC=true;$("mainView").style.display="none";$("contactView").style.display="";window.scrollTo(0,0);return}
   curC=false;$("contactView").style.display="none";$("mainView").style.display="";render(true)}
 window.addEventListener("hashchange",route);
 readTheme();$("themeBtn").textContent=document.documentElement.dataset.theme==="light"?"☾":"☀";
@@ -1159,8 +1146,7 @@ start().then(()=>{if(curF)fvLoad(curF,true)});
 <script src="hf.js?v=5"></script>
 <script>(function(){const el=document.getElementById("widthSel");if(!el)return;let v="fit";try{v=localStorage.getItem("site_width")||"fit"}catch(e){}el.value=v;
 el.onchange=()=>{const x=el.value;try{localStorage.setItem("site_width",x)}catch(e){}document.documentElement.style.setProperty("--pagew",x==="fit"?"100%":x+"px");window.dispatchEvent(new Event("resize"))}})();</script>
-<script src="sell.js?v=2"></script>
-<script src="terms.js?v=2"></script>
+<script src="terms.js?v=3"></script>
 
 <script>
 /* Column explanations: hover a column heading (or a label with a dotted underline) to see what it means. */

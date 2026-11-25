@@ -28,7 +28,7 @@ Sister site: [SOXX Sniper](../SOXX-Sniper/) (SOXL only).
 - Leverage decay: daily drag ≈ L(L−1)/2 × σ², with 1-week, 1-month and 1-year cost.
 - Live news search (every 60 s), StockTwits pulse, and per-fund alerts (price above, price below, day move, new headlines).
 
-Light and dark mode, heartbeat, contact page, Pro card, and demo mode (`index.html?demo`).
+Light and dark mode, heartbeat, contact page and demo mode (`index.html?demo`).
 
 ## Data
 
@@ -63,7 +63,7 @@ The site uses the same Cloudflare Worker as SOXX Sniper. Both sites are on `stev
 
 - Thinly traded funds can show a last trade that is many minutes old. The scanner marks these with a dot and the "$ traded" filter hides them by default.
 - Leveraged ETFs reset each day and lose value in choppy markets. Nothing here is investment advice.
-- Contact: sniperdesk.tribunal635@passmail.net
+- Contact: steven.w.sharp@gmail.com
 
 ## What worked this week (`lessons.js`)
 
