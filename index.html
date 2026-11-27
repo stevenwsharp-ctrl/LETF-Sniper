@@ -1019,11 +1019,16 @@ function maeHtml(m){if(!m||!isFinite(m.q05))return"";const L=Math.abs((UMAP[curF
    showed the result WITH the stop (plan.setup.full.60m +0.233%, LEAN −0.078% CUT) next to a plan without a stop (full +0.302% BACK,
    LEAN +0.014%). It now shows the no-stop result first and the stop result after it. It also shows the frozen day log (.frozen,
    council Nov 25: each market day counted once, the values never change): full no-stop plans are BACK on the plan count (z 2.92,
-   n 129) but only z 0.95 over 16 frozen days (Nov 3 – 24). The BACK ruling counts plans; many plans share one day's move. */
+   n 129) but only z 0.95 over 16 frozen days (Nov 3 – 24). The BACK ruling counts plans; many plans share one day's move.
+   LETF agent, Nov 27 (council task): LEAN plans read their own no-stop item (plan.setup.lean.60m.nostop, new on Nov 26) with its
+   ruling and its frozen day log. Before, the line used the nostop field (same mean, but no ruling and no day log). The field stays
+   the fallback for an older scorecard. Not added: a LEAN open-hour warning. The window says the open hour lost on both halves
+   (no stop: older −0.14%, newer −0.36% per plan, n 91), but counted by frozen day it won on both halves (older +0.16%, newer
+   +0.15%, day z 0.6, 17 days): a few bad days make the loss. */
 function planEvHtml(S){const E=window.EVR;if(!E||!E.ready||!S)return"";const lean=!!S.leanOff||/^LEAN/.test((S.U||S).verdict||""),x=E.item("letf",lean?"plan.setup.lean.60m":"plan.setup.full.60m"),a=E.item("letf","plan.setup.60m");if(!x)return"";
   const p=v=>isFinite(v)?(v>=0?"+":"−")+Math.abs(v*100).toFixed(2)+"%":"--",c=v=>v>0?"up":v<0?"down":"",L=Math.abs((UMAP[curF]||{}).L||0),
     RU={mute:"MUTE (proven negative)",cut:"CUT",back:"BACK (proven positive)",watch:"WATCH (not proven)"},rul=RU[x.status]||x.status,
-    ns=S.plan&&stopOff(S)?(lean?(x.nostop&&x.nostop.n?{n:x.nostop.n,ev:x.nostop.m,older:x.nostop.older,recent:x.nostop.recent,status:""}:null):E.item("letf","plan.setup.full.60m.nostop")):null,
+    ns=S.plan&&stopOff(S)?(lean?(E.item("letf","plan.setup.lean.60m.nostop")||(x.nostop&&x.nostop.n?{n:x.nostop.n,ev:x.nostop.m,older:x.nostop.older,recent:x.nostop.recent,status:""}:null)):E.item("letf","plan.setup.full.60m.nostop")):null,
     y=ns||x,fz=y.frozen,mon=d=>d?["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+d.slice(5,7)-1]+" "+(+d.slice(8)):"",
     frz=fz&&fz.days>=5&&isFinite(fz.z)?` Frozen day log (${fz.days} market days, ${mon(fz.from)} – ${mon(fz.to)}, each day counted once, the values never change): <b class="${c(fz.ev)}">${p(fz.ev)}</b> per plan, day z ${(fz.z<0?"−":"")+Math.abs(fz.z).toFixed(1)}, older days <b class="${c(fz.older)}">${p(fz.older)}</b>, newer days <b class="${c(fz.recent)}">${p(fz.recent)}</b>.${y.status==="back"&&fz.z<2?" BACK counts plans; counted by day, the edge is not proven yet. Do not size up on it.":""}`:"";
   if(ns)return`<div class="sub" style="margin-top:6px;font-size:12.5px">Test of ${lean?"LEAN plans (2 of 3 filters)":"LONG / SHORT SETUP plans (all 3 filters)"} with no stop order, as shown above, 1 month of 5-minute bars, limit entry counted only when touched: <b class="${c(y.ev)}">${p(y.ev)}</b> per plan on the underlying${L>1?` (about ×${L} on this fund, before decay)`:""}, n ${y.n} · older days <b class="${c(y.older)}">${p(y.older)}</b> · newer days <b class="${c(y.recent)}">${p(y.recent)}</b>${y.status?" · "+esc(RU[y.status]||y.status):""}${a&&isFinite(a.fill)?` · ${Math.round(a.fill*100)}% of limits filled`:""}. The same plans with the stop: <b class="${c(x.ev)}">${p(x.ev)}</b> · ${esc(rul)}.${frz}</div>`;
